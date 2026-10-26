@@ -33,6 +33,10 @@ The input delay (shown in the Online panel) is set from everyone's ping, typical
 frames between friends in the same region; the host can adjust it before starting. If a
 copy ever drifts out of sync, the host's game state is re-sent automatically.
 
+In a split-screen race each player sees only their own view, enlarged to fill the window
+(the "Show all views" button switches back). Rush 2049's multiplayer starts from the START GAME
+menu: set PLAYERS to 2-4 with the D-pad, then each player picks "Just Play".
+
 Keep the game tab in front: a hidden tab pauses, and everyone waits for it.
 
 ## Controls
@@ -59,6 +63,8 @@ python3 serve.py
 
 ## How it works
 
+- `myview.js`: finds the split-screen race layout from the black gap between views and shows
+  only this player's view (CSS transform + clip on the emulator canvas, 2x internal resolution).
 - `netplay.js`: lockstep netplay over WebRTC data channels (PeerJS for connection setup,
   with its free public signalling and TURN servers). Each frame runs only after every
   player's input for that frame has arrived; inputs are sent a few frames ahead (the input

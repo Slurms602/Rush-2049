@@ -107,6 +107,7 @@
     function post() {
         net.fpsFrames = (net.fpsFrames || 0) + 1;
         if (!net.session) return;
+        if (window.DC_VIEW) window.DC_VIEW.tick();
         const done = ++net.frame;
         if ((done & 127) === 0) {
             for (const m of net.inputs) for (const k of m.keys()) if (k < done - KEEP) m.delete(k);
@@ -243,6 +244,9 @@
         const g = gm();
         core()._fly_set_lockstep(1);
         g.setVSync(false);           // loop runs freely; paced() decides when a frame runs
+        // Each player sees an enlarged part of the split screen (myview.js); render at 2x so
+        // it stays sharp. Rendering only, so it can't affect sync.
+        if (!net.software) g.setVariable("reicast_internal_resolution", "1280x960");
         g.loadState(state);          // lands a few frames later, on the same frame everywhere
     }
 
@@ -253,6 +257,8 @@
         try {
             core()._fly_set_lockstep(0);
             gm().setVSync(true);
+            if (!net.software) gm().setVariable("reicast_internal_resolution", "640x480");
+            if (window.DC_VIEW) window.DC_VIEW.reset();
             const raw = gm().functions.simulateInput;
             for (let s = 0; s < MAX_PLAYERS; s++) for (let i = 0; i < 24; i++) raw(s, i, 0);
         } catch (e) { console.warn(e); }
@@ -355,11 +361,27 @@
         } else if (msg.t === "pong") c.rtt = c.rtt ? c.rtt * 0.8 + (now() - msg.ts) * 0.2 : now() - msg.ts;
     }
 
+    // Is the link direct, or detouring through the relay (TURN) server? Relays add latency.
+    async function updateRoute(c) {
+        const pc = c.inp && c.inp.peerConnection;
+        if (!pc) return;
+        const stats = await pc.getStats();
+        let pair = null;
+        stats.forEach((r) => { if (r.type === "transport" && r.selectedCandidatePairId) pair = stats.get(r.selectedCandidatePairId); });
+        if (!pair) stats.forEach((r) => { if (r.type === "candidate-pair" && r.nominated && r.state === "succeeded") pair = r; });
+        if (!pair) return;
+        const local = stats.get(pair.localCandidateId), remote = stats.get(pair.remoteCandidateId);
+        c.route = [local, remote].some((x) => x && x.candidateType === "relay") ? "relayed" : "direct";
+    }
+
     function wire(c) {
         c.ctl.on("data", (msg) => onControl(c, msg));
         c.inp.on("data", (msg) => (msg.t === "i" ? onInput(c, msg) : onPing(c, msg)));
-        c.pinger = setInterval(() => send(c.inp, { t: "ping", ts: now(), f: net.frame, fps: net.fps,
-            w: net.session && net.waiting ? 1 : 0, h: document.hidden ? 1 : 0 }), 1000);
+        c.pinger = setInterval(() => {
+            send(c.inp, { t: "ping", ts: now(), f: net.frame, fps: net.fps,
+                w: net.session && net.waiting ? 1 : 0, h: document.hidden ? 1 : 0 });
+            updateRoute(c).catch(() => {});
+        }, 1000);
     }
 
     // ---------- host ----------
@@ -507,7 +529,7 @@
                 const c = peerOfSlot(p.slot);
                 const r = c && c.remote;
                 const info = [];
-                if (net.role === "host" && c && c.rtt) info.push(Math.round(c.rtt) + " ms");
+                if (c && c.rtt) info.push(Math.round(c.rtt) + " ms" + (c.route ? " " + c.route : ""));
                 if (r && r.fps !== undefined) info.push(r.fps + " fps");
                 if (r && r.hidden) info.push("tab in background");
                 if (r && r.loading) info.push("loading");
@@ -561,7 +583,8 @@
             const ext = gl.getExtension("WEBGL_debug_renderer_info");
             renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
         } catch (e) {}
-        if (/Basic Render Driver|SwiftShader|llvmpipe|softpipe|Software/i.test(renderer)) {
+        net.software = /Basic Render Driver|SwiftShader|llvmpipe|softpipe|Software/i.test(renderer);
+        if (net.software) {
             const w = document.getElementById("gpu-warning");
             if (w) w.hidden = false;
             // Drawing in software: a quarter of the pixels keeps the game playable.

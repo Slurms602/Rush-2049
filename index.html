@@ -8,6 +8,7 @@
 <script src="coi-serviceworker.js"></script>
 <script src="vendor/peerjs.min.js"></script>
 <script src="netplay.js"></script>
+<script src="myview.js"></script>
 <style>
   :root { --bg: #0d0f14; --panel: #161a22; --line: #2a3140; --text: #e6e9ef; --muted: #8a93a6; --accent: #f08a24; }
   * { box-sizing: border-box; }
@@ -31,7 +32,7 @@
   table { width: 100%; border-collapse: collapse; margin-top: 28px; font-size: 14px; }
   td { padding: 4px 0; border-bottom: 1px solid var(--line); }
   td:first-child { font-family: ui-monospace, monospace; color: var(--accent); width: 40%; }
-  #game-wrap { display: none; position: fixed; inset: 0; background: #000; touch-action: none; }
+  #game-wrap { display: none; position: fixed; inset: 0; background: #000; touch-action: none; overflow: hidden; }
   .touch-only { display: none; }
   body.mobile .touch-only { display: table; }
   body.mobile .keys-only { display: none; }
@@ -41,7 +42,7 @@
   #game-buttons { position: fixed; top: 10px; right: 10px; z-index: 20; display: flex; gap: 6px; }
   #game-buttons button { width: auto; padding: 6px 12px; font-size: 13px; opacity: .75; }
   #game-buttons button:hover { opacity: 1; }
-  #change-game { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
+  #change-game, #my-view { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
   #net-panel { position: fixed; top: 46px; right: 10px; z-index: 20; width: min(340px, calc(100vw - 32px)); padding: 14px; border-radius: 12px;
     background: var(--panel); border: 1px solid var(--line); font-size: 14px; }
   #net-panel p { margin: 0 0 10px; }
@@ -101,7 +102,7 @@
 </div>
 
 <div id="game-wrap"><div id="game"></div>
-  <div id="game-buttons"><button id="change-game" hidden>Change game</button><button id="net-toggle" hidden>Online</button></div>
+  <div id="game-buttons"><button id="my-view" hidden onclick="DC_VIEW.toggle()">Show all views</button><button id="change-game" hidden>Change game</button><button id="net-toggle" hidden>Online</button></div>
   <div id="net-panel" hidden><div id="net-body"></div></div>
   <div id="net-status" hidden></div>
   <div id="fps"></div>
