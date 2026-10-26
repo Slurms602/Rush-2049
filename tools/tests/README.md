@@ -20,6 +20,13 @@ node tools/tests/custom-track-online.cjs http://localhost:8080/ /tmp/rush-online
 
 The driving bot steers from the car's wheel positions in actual Dreamcast RAM. It must
 complete a forward lap, cross the gap and remain at road altitude without respawning.
+It brakes for upcoming curves and records slip angle, tire materials and suspension
+compression. Native material 0 is pavement; material 8 indicates a tire in the air.
+Away from the jump and its settling runout, it requires four-tire pavement contact
+in at least 95% of moving samples and rejects any flight with all four tires in air.
+For private A/B runs, pass a third argument naming a bundle directory containing its
+manifest, five files and `track.json`. `RUSH_DRIVE_MODE=grip` retains the original
+full-throttle bot for comparisons on the same layout.
 Review its screenshots to check rendering; position assertions cannot prove that a car
 body is visible.
 

@@ -57,6 +57,27 @@ class TrackBuilderTests(unittest.TestCase):
         self.assertEqual(len(files), 5)
         validate_files(files)
 
+    def test_banked_triangles_use_their_geometric_contact_plane(self):
+        # A changing bank twists a road quad. The average section normal is
+        # unsuitable for either triangle: all local vertices must have y=0.
+        points = [[-45, 600, 0], [45, 620, 0], [44, 625, 10], [-44, 602, 10]]
+        polygons = [(points[:3], [0, 1, 0], 0),
+                    ([points[0], points[2], points[3]], [0, 1, 0], 0)]
+        road = Road(road_file(polygons))
+        for i in range(2):
+            self.assertTrue(all(abs(v[1]) <= 1 / 32 for v in road.surface_vertices(i)[1:]))
+            self.assertGreater(road.surface(i)[2][4], 0)
+
+    def test_validator_rejects_a_step_in_a_collision_contact_plane(self):
+        files = {p.name: p.read_bytes() for p in (ROOT / "tracks/neon-skyway").glob("*.LZS")}
+        data = bytearray(decode(files["TRACK1ROAD.LZS"]))
+        road = Road(data)
+        local_vertex = road.surface_indices(0)[1]
+        struct.pack_into("<h", data, road.vert_off + local_vertex * 8 + 2, 1)
+        files["TRACK1ROAD.LZS"] = encode(data)
+        with self.assertRaisesRegex(ValueError, "contact plane"):
+            validate_files(files)
+
     def test_mesh_cache_can_be_overwritten_but_not_indexed_out_of_bounds(self):
         mesh = Mesh([0, 0, 0])
         mesh.texture(0)

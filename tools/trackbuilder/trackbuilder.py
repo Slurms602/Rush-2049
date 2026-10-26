@@ -356,13 +356,17 @@ def road_file(polys):
         pts = [np.asarray(p, float) for p in pts]
         o = pts[0]
         r0 = pts[1] - o; r0 /= np.linalg.norm(r0)
-        r1 = np.asarray(normal, float); r1 = r1 - r0 * np.dot(r1, r0); r1 /= np.linalg.norm(r1)
+        # Collision tests use y=0 in this frame as the contact plane. Averaging
+        # the cross-section normals leaves the third corner off that plane on
+        # changing slopes/banks, creating steps between neighboring triangles.
+        r1 = np.cross(pts[1] - o, pts[2] - o)
+        r1 /= np.linalg.norm(r1)
+        if np.dot(r1, normal) < 0: r1 = -r1
         r2 = np.cross(r0, r1)
         M = np.array([r0, r1, r2])
         if np.dot(pts[2] - o, r2) < 0:                       # third corner on the +z side
             pts = [pts[0]] + pts[1:][::-1]
             r0 = pts[1] - o; r0 /= np.linalg.norm(r0)
-            r1 = np.asarray(normal, float); r1 = r1 - r0 * np.dot(r1, r0); r1 /= np.linalg.norm(r1)
             r2 = np.cross(r0, r1); M = np.array([r0, r1, r2])
         local = [M @ (p - o) for p in pts[1:]]
         first = nv

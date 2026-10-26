@@ -138,7 +138,7 @@ const picked = { rom: [], bios: [] };
 function showTrackChoice() {
   $("track-select").value = DC_TRACK.id;
   $("track-description").textContent = DC_TRACK.id === "original" ? "Play the game's original tracks."
-    : "Floating neon roads and banked turns. Select Marina (Track 1) in the game to race Neon Skyway. This preview replaces Track 1 while enabled.";
+    : "Floating neon roads, alternating esses and braking corners. Select Marina (Track 1) in the game to race Neon Skyway. This preview replaces Track 1 while enabled.";
   $("track-current").textContent = DC_TRACK.id === "original" ? "Currently playing: original tracks." : "Currently playing: Neon Skyway. Select Marina (Track 1) in the game.";
   $("play-neon").disabled = DC_TRACK.id === "neon-skyway";
   $("play-original").disabled = DC_TRACK.id === "original";

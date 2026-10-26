@@ -10,7 +10,7 @@ From the repository root, with Python 3.10 or later:
 
 ```sh
 python3 -m pip install -r tools/trackbuilder/requirements.txt
-python3 tools/trackbuilder/build.py tracks/neon-skyway/track.json --out tracks/neon-skyway
+python3 tools/trackbuilder/build.py tracks/neon-skyway/track.json --out tracks/neon-skyway --version 2
 ```
 
 The command writes five `.LZS` files, `manifest.json` with SHA-256 checksums, and an SVG
@@ -26,7 +26,7 @@ do not repeat the first point at the end. Optional fields:
 | Field | Meaning |
 | --- | --- |
 | `width` | Full road width in feet, default 60; supported range 40–200. |
-| `bank` | Bank angle in degrees, default 0; positive raises the `cross(forward, up)` side. Use negative values for the turns in the supplied layout. |
+| `bank` | Bank angle in degrees, default 0; positive raises the `cross(forward, up)` side. Keep banks mild and transition gradually. |
 | `gap` | If true, omit the road from this point to the next. The racing line continues through the jump. |
 | `rails` | Side walls, default true. Set false for open edges. |
 
@@ -35,6 +35,12 @@ The supported circuit length is 1,500–10,000 feet; both compressed and decoded
 fit the original slot's allocations. Wide curves are easier for both players and the AI.
 Keep jumps straight and provide a wide landing. The builder does not prove a jump is
 drivable: test it in the game after every layout change.
+
+Collision triangles use their actual geometric plane. The native tire query assumes
+all surface-local vertices have Y=0; averaging road-section normals can create contact
+steps as a bank or grade changes. The validator rejects those off-plane vertices.
+Even correct collision can unload the tires over a sharp crest. Neon Skyway's revised
+layout uses flat cross-sections and gentle grades outside its intentional jump.
 
 For the existing browser selection, keep the bundle ID `neon-skyway` and slot 1. Rebuild
 into `tracks/neon-skyway`; increment `--version` when publishing a changed track. The

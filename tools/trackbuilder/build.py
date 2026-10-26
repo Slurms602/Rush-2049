@@ -94,6 +94,10 @@ def validate_files(files):
     for i in range(road.counts[2]):
         if any(v >= road.counts[3] for v in road.surface_indices(i)):
             raise ValueError("Invalid collision vertex index.")
+        # Only the first vertex is world-space; all remaining vertices are
+        # surface-local. The game's tire query assumes their plane is y=0.
+        if any(abs(v[1]) > 1 / 32 for v in road.surface_vertices(i)[1:]):
+            raise ValueError("Collision vertices do not lie on their contact plane.")
     for name in ("TRACK1PATH.LZS", "TRACK1PATHBACK.LZS"):
         p = Path(decoded[name])
         if p.end != len(p.data) or p.ncp < 2 or len(p.lines) != 4:

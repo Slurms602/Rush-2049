@@ -11,7 +11,7 @@ Other Dreamcast games boot too, but online play has only been tested with Rush 2
 
 Open the site with `?track=neon-skyway`, or use the **Tracks** button and choose **Play
 Neon Skyway**. In the game, choose **Single Race → Marina (Track 1)**. This loads a new
-floating circuit with neon roads, banked turns, coins and a wing jump. Its files are
+floating circuit with neon roads, alternating esses, braking corners, coins and a wing jump. Its files are
 downloaded automatically; your game image is never modified. **Play original tracks**
 restarts with the original disc content.
 
