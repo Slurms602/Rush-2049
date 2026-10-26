@@ -135,12 +135,29 @@
         const t = now();
         if (!net.stallSince || net.stallSlot !== s) { net.stallSince = t; net.stallSlot = s; net.needSentAt = 0; }
         const waited = t - net.stallSince;
-        if (waited > STALL_HINT_MS) ui.status("Waiting for P" + (s + 1) + "…");
+        if (waited > STALL_HINT_MS) ui.status("Waiting for P" + (s + 1) + "…" + stallReason(s));
+        if (net.role === "host" && waited > 5000 && t - (net.lastResync || 0) > 15000) {
+            net.lastResync = t;
+            console.warn("[net] P" + (s + 1) + " stalled for 5 s; re-syncing");
+            startMatch("resync");
+            return;
+        }
         if (waited > NEED_AFTER_MS && t - net.needSentAt > NEED_AFTER_MS) {
             net.needSentAt = t;
             const to = net.role === "host" ? peerOfSlot(s) : hostConn();
             if (to) send(to.ctl, { t: "need", s, f });
         }
+    }
+
+    // What we know about why a player is behind (from their pings).
+    function stallReason(s) {
+        const c = peerOfSlot(s);
+        const r = c && c.remote;
+        if (!r) return "";
+        if (r.hidden) return " (their game tab is in the background)";
+        if (r.loading) return " (they're loading the game state)";
+        if (r.fps !== undefined && r.fps < 40) return " (their game runs at " + r.fps + " fps)";
+        return "";
     }
 
     // ---------- desync checks ----------
@@ -290,9 +307,17 @@
                 net.pending = msg;
                 net.waiting = true;
                 ui.status("Loading the host's game state…");
+                clearTimeout(net.stateTimer);
+                net.stateTimer = setTimeout(() => {
+                    if (net.waiting && net.pending === msg) send(c.ctl, { t: "resend" });
+                }, 20000);
+                break;
+            case "resend":
+                if (net.role === "host") startMatch("resync");
                 break;
             case "state":
                 if (!net.pending || net.pending.epoch !== msg.epoch) break;
+                clearTimeout(net.stateTimer);
                 gunzip(msg.data).then((state) => {
                     const p = net.pending;
                     begin(state, p.epoch, p.delay, p.active);
@@ -324,14 +349,17 @@
     }
 
     function onPing(c, msg) {
-        if (msg.t === "ping") send(c.inp, { t: "pong", ts: msg.ts });
-        else if (msg.t === "pong") c.rtt = c.rtt ? c.rtt * 0.8 + (now() - msg.ts) * 0.2 : now() - msg.ts;
+        if (msg.t === "ping") {
+            send(c.inp, { t: "pong", ts: msg.ts });
+            c.remote = { frame: msg.f, fps: msg.fps, loading: msg.w, hidden: msg.h };
+        } else if (msg.t === "pong") c.rtt = c.rtt ? c.rtt * 0.8 + (now() - msg.ts) * 0.2 : now() - msg.ts;
     }
 
     function wire(c) {
         c.ctl.on("data", (msg) => onControl(c, msg));
         c.inp.on("data", (msg) => (msg.t === "i" ? onInput(c, msg) : onPing(c, msg)));
-        c.pinger = setInterval(() => send(c.inp, { t: "ping", ts: now() }), 1000);
+        c.pinger = setInterval(() => send(c.inp, { t: "ping", ts: now(), f: net.frame, fps: net.fps,
+            w: net.session && net.waiting ? 1 : 0, h: document.hidden ? 1 : 0 }), 1000);
     }
 
     // ---------- host ----------
@@ -477,8 +505,13 @@
             const link = location.origin + location.pathname + "?join=" + net.code;
             const rows = (net.lobby || [{ slot: net.mySlot }]).map((p) => {
                 const c = peerOfSlot(p.slot);
-                const ping = net.role === "host" && c && c.rtt ? " · " + Math.round(c.rtt) + " ms" : "";
-                return "<li>P" + (p.slot + 1) + (p.slot === net.mySlot ? " (you)" : "") + ping + "</li>";
+                const r = c && c.remote;
+                const info = [];
+                if (net.role === "host" && c && c.rtt) info.push(Math.round(c.rtt) + " ms");
+                if (r && r.fps !== undefined) info.push(r.fps + " fps");
+                if (r && r.hidden) info.push("tab in background");
+                if (r && r.loading) info.push("loading");
+                return "<li>P" + (p.slot + 1) + (p.slot === net.mySlot ? " (you)" : "") + (info.length ? " · " + info.join(" · ") : "") + "</li>";
             }).join("");
             let html;
             if (!net.role) {
@@ -515,7 +548,12 @@
         const join_ = new URLSearchParams(location.search).get("join");
         if (join_) join(join_);
         ui.refresh();
-        setInterval(() => { if (net.role === "host" && !net.session) ui.refresh(); }, 2000);
+        setInterval(() => {
+            const panel = document.getElementById("net-panel");
+            if (net.role && panel && !panel.hidden && !panel.contains(document.activeElement)) ui.refresh();
+        }, 2000);
+        // Show script errors instead of failing silently, so friends can report them.
+        window.addEventListener("error", (e) => ui.status("Error: " + e.message, 15000));
         // Which GPU the browser draws with. A software renderer can't keep up with the game.
         let renderer = "";
         try {
@@ -546,6 +584,7 @@
             const fps = Math.round((f - lastF) * 1000 / (t - lastT));   // 0 during videos (not 3D frames)
             const speed = m._fly_guest_seconds ? Math.round((g - lastG) * 100000 / (t - lastT)) + "% speed" : "";
             if (el) el.textContent = [fps ? fps + " fps" : "", speed].filter(Boolean).join(" · ") + gpu;
+            net.fps = fps;
             lastF = f; lastG = g; lastT = t;
         }, 1000);
     };
