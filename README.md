@@ -78,6 +78,8 @@ python3 serve.py
   per display refresh, and the players' clocks are lined up so that everyone has the same
   headroom for late inputs. Every 2 seconds each guest sends a hash of its emulated RAM,
   VRAM and CPU state to the host, which re-sends its save state if they differ.
+- `mods.js`: replaces files on the game disc as the emulator reads it (through a hook in the
+  core), building the changes from each player's own disc, for custom content.
 - `ejs/data/cores/flycast-wasm.data`: a rebuild of the flycast-wasm core that behaves
   identically on fast and slow machines. See [core-build/](core-build/README.md).
 - `ejs/data/src/dc-patches.js`: glue between the page and EmulatorJS, including the

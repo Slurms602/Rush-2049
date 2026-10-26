@@ -17,6 +17,10 @@ many frames to run per tick from the wall clock. The changes:
   frame per `retro_run` with no wall-clock pacing (the page paces frames),
   `fly_state_hash()` hashes RAM, VRAM, sound RAM and the CPU registers for desync checks,
   and `fly_render_count()` counts emulated frames for the fps readout.
+- `disc_patch.py` (on `core/imgread/common.cpp`): `fly_disc_patch_add(fad, count, data)` makes
+  reads of those 2048-byte disc sectors return the page's data instead (for mods: `mods.js`
+  builds the patches from the player's own disc, the same on every machine), and
+  `fly_disc_read` reads the image as stored.
 - `build-prod.sh`: adds those and `fly_jit_helper_ptrs` to `EXPORTED_FUNCTIONS`.
 
 Verified: two instances, one CPU-throttled 3x, loaded the same state and ran 2,400 frames
@@ -42,6 +46,7 @@ cp ../flycast-wasm/patches/{rec_wasm.cpp,wasm_emit.h,wasm_module_builder.h,fly_i
 python3 $R/core-build/deterministic_jit.py core/rec-wasm/rec_wasm.cpp
 python3 $R/core-build/speed_patches.py .
 python3 $R/core-build/lockstep.py shell/libretro/libretro.cpp
+python3 $R/core-build/disc_patch.py core/imgread/common.cpp
 cd .. && bash $R/core-build/build-all.sh     # output in out/
 ```
 
