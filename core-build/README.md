@@ -9,11 +9,15 @@ many frames to run per tick from the wall clock. The changes:
 - `deterministic_jit.py` (on `core/rec-wasm/rec_wasm.cpp`): the JIT keeps its batching and
   chains but makes every scheduling decision by count instead of elapsed time, and compiles
   chains synchronously so they go live on the same frame everywhere. Details in the script.
+- `speed_patches.py` (on the source root): removes JavaScript round trips from the hot
+  path. Compiled blocks were being called through Emscripten's JS exception trampolines
+  (the dispatch loop got inlined into a try/catch), and their memory helpers through
+  Asyncify's JS export wrappers; together ~40% of race time. Now plain wasm calls.
 - `lockstep.py` (on `shell/libretro/libretro.cpp`): `fly_set_lockstep(1)` runs exactly one
   frame per `retro_run` with no wall-clock pacing (the page paces frames),
   `fly_state_hash()` hashes RAM, VRAM, sound RAM and the CPU registers for desync checks,
   and `fly_render_count()` counts emulated frames for the fps readout.
-- `build-prod.sh`: adds those three to `EXPORTED_FUNCTIONS`.
+- `build-prod.sh`: adds those and `fly_jit_helper_ptrs` to `EXPORTED_FUNCTIONS`.
 
 Verified: two instances, one CPU-throttled 3x, loaded the same state and ran 2,400 frames
 of scripted input into a race with identical state hashes at every 60-frame checkpoint.
@@ -36,6 +40,7 @@ git apply ../flycast-wasm/patches/wasm-jit-phase1-modified.patch
 mkdir -p core/rec-wasm
 cp ../flycast-wasm/patches/{rec_wasm.cpp,wasm_emit.h,wasm_module_builder.h,fly_instrument.h} core/rec-wasm/
 python3 $R/core-build/deterministic_jit.py core/rec-wasm/rec_wasm.cpp
+python3 $R/core-build/speed_patches.py .
 python3 $R/core-build/lockstep.py shell/libretro/libretro.cpp
 cd .. && bash $R/core-build/build-all.sh     # output in out/
 ```
