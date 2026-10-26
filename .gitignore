@@ -17,3 +17,6 @@ flycast_libretro.wasm
 
 .DS_Store
 __pycache__/
+
+# Screenshots dropped in the repo root
+/*.png

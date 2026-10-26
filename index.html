@@ -56,6 +56,9 @@
     background: rgba(0,0,0,.7); color: #fff; font-size: 14px; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
   #fps { position: fixed; top: 8px; left: 10px; z-index: 20; font: 12px ui-monospace, monospace; color: #fff; text-shadow: 0 0 3px #000; opacity: .8; pointer-events: none; white-space: pre-line; max-width: 60vw; }
   #fps.below-hud { top: 40px; }
+  #gpu-warning { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); z-index: 21; width: min(560px, calc(100vw - 32px));
+    padding: 12px 14px; border-radius: 10px; background: #3a1d12; border: 1px solid var(--accent); color: var(--text); font-size: 14px; }
+  #gpu-warning button { width: auto; margin-top: 8px; padding: 6px 14px; font-size: 13px; }
   .join-banner { padding: 12px 14px; border-radius: 10px; background: var(--panel); border: 1px solid var(--accent); margin-bottom: 18px; }
 </style>
 </head>
@@ -107,6 +110,12 @@
   <div id="net-panel" hidden><div id="net-body"></div></div>
   <div id="net-status" hidden></div>
   <div id="fps"></div>
+  <div id="gpu-warning" hidden>
+    <b>Your browser isn't using your graphics card</b>, so the game will run slowly.
+    In Chrome or Edge: Settings → System → turn on "Use graphics acceleration when available", then restart the browser.
+    If that's already on, update your graphics driver (NVIDIA / AMD / Intel website).
+    <button onclick="this.parentElement.hidden = true">OK</button>
+  </div>
 </div>
 
 <script>

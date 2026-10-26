@@ -509,15 +509,22 @@
         if (join_) join(join_);
         ui.refresh();
         setInterval(() => { if (net.role === "host" && !net.session) ui.refresh(); }, 2000);
+        // Which GPU the browser draws with. A software renderer can't keep up with the game.
+        let renderer = "";
+        try {
+            const gl = window.EJS_emulator.canvas.getContext("webgl2");
+            const ext = gl.getExtension("WEBGL_debug_renderer_info");
+            renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+        } catch (e) {}
+        if (/Basic Render Driver|SwiftShader|llvmpipe|softpipe|Software/i.test(renderer)) {
+            const w = document.getElementById("gpu-warning");
+            if (w) w.hidden = false;
+        }
         // ?hud=1: also show the emulator's own timing HUD (drawn by the core) and the GPU in use.
         let gpu = "";
         if (/[?&]hud=1/.test(location.search)) {
             document.getElementById("fps").classList.add("below-hud");
-            try {
-                const gl = window.EJS_emulator.canvas.getContext("webgl2");
-                const ext = gl.getExtension("WEBGL_debug_renderer_info");
-                gpu = "\n" + (ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) + "\n" + navigator.userAgent;
-            } catch (e) { gpu = "\n(GPU unknown)"; }
+            gpu = "\n" + (renderer || "(GPU unknown)") + "\n" + navigator.userAgent;
         }
         // Frames the game drew in the last second, and game speed (emulated time per real
         // second; below 100% the game runs in slow motion and the audio stutters).
