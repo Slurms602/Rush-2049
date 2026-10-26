@@ -509,13 +509,28 @@
         if (join_) join(join_);
         ui.refresh();
         setInterval(() => { if (net.role === "host" && !net.session) ui.refresh(); }, 2000);
-        // Frames the emulator ran in the last second (what the players actually see).
-        const count = () => (core()._fly_render_count ? core()._fly_render_count() : net.fpsFrames);
-        let last = count();
+        // ?hud=1: also show the emulator's own timing HUD (drawn by the core) and the GPU in use.
+        let gpu = "";
+        if (/[?&]hud=1/.test(location.search)) {
+            document.getElementById("fps").classList.add("below-hud");
+            try {
+                const gl = window.EJS_emulator.canvas.getContext("webgl2");
+                const ext = gl.getExtension("WEBGL_debug_renderer_info");
+                gpu = "\n" + (ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) + "\n" + navigator.userAgent;
+            } catch (e) { gpu = "\n(GPU unknown)"; }
+        }
+        // Frames the game drew in the last second, and game speed (emulated time per real
+        // second; below 100% the game runs in slow motion and the audio stutters).
+        const m = core();
+        const frames = () => (m._fly_render_count ? m._fly_render_count() : net.fpsFrames);
+        const guest = () => (m._fly_guest_seconds ? m._fly_guest_seconds() : 0);
+        let lastF = frames(), lastG = guest(), lastT = now();
         setInterval(() => {
-            const n = count(), el = document.getElementById("fps");
-            if (el) el.textContent = Math.round(n - last) + " fps";
-            last = n;
+            const f = frames(), g = guest(), t = now(), el = document.getElementById("fps");
+            const fps = Math.round((f - lastF) * 1000 / (t - lastT));   // 0 during videos (not 3D frames)
+            const speed = m._fly_guest_seconds ? Math.round((g - lastG) * 100000 / (t - lastT)) + "% speed" : "";
+            if (el) el.textContent = [fps ? fps + " fps" : "", speed].filter(Boolean).join(" · ") + gpu;
+            lastF = f; lastG = g; lastT = t;
         }, 1000);
     };
     net.host = host;

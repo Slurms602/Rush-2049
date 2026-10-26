@@ -5,8 +5,8 @@ fly_set_lockstep(1): exactly one emu.render() per retro_run, no wall-clock pacin
   (the page decides when each frame runs).
 fly_state_hash(): xxHash of main RAM, VRAM, sound RAM and the SH4 context, for
   cheap desync checks.
-fly_render_count(): frames emulated so far (for an honest fps readout; retro_run may
-  run zero, one or two frames).
+fly_render_count(): frames the game has drawn so far, and fly_guest_seconds(): emulated
+  time so far; together they give the page an honest fps and game-speed readout.
 """
 import sys
 
@@ -22,7 +22,7 @@ src = src.replace(anchor, "\t\tif (settings.input.fastForwardMode || fly_lockste
 
 render_anchor = "\t\t\t\t\t\temu.render();\n\t\t\t\t\t\tg_fly_rp[4] += emscripten_get_now() - fly_er_t0;"
 assert src.count(render_anchor) == 1, "render anchor not found"
-src = src.replace(render_anchor, render_anchor + "\n\t\t\t\t\t\tfly_renders++;")
+src = src.replace(render_anchor, render_anchor.replace("emu.render();", "if (emu.render()) fly_renders++;"))
 
 include_anchor = '#include "hw/sh4/sh4_mem.h"\n'
 assert src.count(include_anchor) == 1
@@ -31,6 +31,7 @@ src = src.replace(include_anchor, include_anchor + '''#ifdef __EMSCRIPTEN__
 #include "hw/pvr/pvr_mem.h"
 #include "hw/aica/aica_if.h"
 #include "hw/sh4/sh4_if.h"
+#include "hw/sh4/sh4_sched.h"
 
 // Lockstep netplay: when set, retro_run runs exactly one emu.render() and ignores
 // the wall clock, so every machine advances identically per call.
@@ -38,6 +39,7 @@ static bool fly_lockstep = false;
 extern "C" EMSCRIPTEN_KEEPALIVE void fly_set_lockstep(int on) { fly_lockstep = on != 0; }
 static double fly_renders = 0;
 extern "C" EMSCRIPTEN_KEEPALIVE double fly_render_count() { return fly_renders; }
+extern "C" EMSCRIPTEN_KEEPALIVE double fly_guest_seconds() { return (double)sh4_sched_now64() / 200000000.0; }
 
 // Desync check: hash of guest-visible memory and CPU state.
 extern "C" EMSCRIPTEN_KEEPALIVE double fly_state_hash()
