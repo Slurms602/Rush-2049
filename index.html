@@ -69,16 +69,11 @@
   <div class="join-banner" id="join-banner" hidden></div>
 
   <label class="drop" id="rom-drop">
-    <strong>1. Game image</strong>
-    <small>.chd or .cdi (one file), .gdi plus all its track files (select them together), or a .zip/.7z containing them</small>
+    <strong>Game files</strong>
+    <small>Select the game (one .chd file, or a .gdi with all its track files) and the two BIOS files
+      (dc_boot.bin, dc_flash.bin) all at once, or drag them, or their folder, onto this box. Adding them in two goes works too.</small>
     <input type="file" id="rom" multiple>
     <div class="files" id="rom-list"></div>
-  </label>
-
-  <label class="drop" id="bios-drop">
-    <strong>2. BIOS (optional)</strong>
-    <small>dc_boot.bin + dc_flash.bin from your own Dreamcast. Without them Flycast's built-in HLE BIOS is used, which runs most games.</small>
-    <input type="file" id="bios" multiple>
     <div class="files" id="bios-list"></div>
   </label>
 
@@ -170,6 +165,15 @@ function localFile(f) {
   };
 }
 
+// One box takes everything: the BIOS files are recognised by name, the rest is the game.
+const isBios = (f) => /^dc_(boot|flash)\.bin$/i.test(f.name);
+function addFiles(list) {
+  const files = Array.from(list);
+  const game = files.filter((f) => !isBios(f)), bios = files.filter(isBios);
+  if (game.length) setFiles("rom", game);
+  if (bios.length) setFiles("bios", bios);
+}
+
 function setFiles(kind, list) {
   picked[kind] = Array.from(list);
   $(kind + "-list").textContent = picked[kind].map(f => f.name + "  (" + (f.size / 1048576).toFixed(1) + " MB)").join("\n");
@@ -177,6 +181,8 @@ function setFiles(kind, list) {
   const romMB = picked.rom.reduce((n, f) => n + f.size, 0) / 1048576;
   $("note").textContent = MOBILE && romMB > 700
     ? `This image is ${Math.round(romMB)} MB. Phones can run out of memory on images this big; a .chd version is much smaller.`
+    : picked.rom.length && !picked.bios.length
+    ? "Add the two BIOS files too (dc_boot.bin, dc_flash.bin). The game starts without them, but online play needs them."
     : "";
   if (kind === "rom") checkGdi(picked.rom).then((msg) => {
     $("err").textContent = msg;
@@ -215,15 +221,15 @@ async function droppedFiles(dt) {
   return out;
 }
 
-for (const kind of ["rom", "bios"]) {
-  const drop = $(kind + "-drop");
-  $(kind).addEventListener("change", (e) => setFiles(kind, e.target.files));
+{
+  const drop = $("rom-drop");
+  $("rom").addEventListener("change", (e) => addFiles(e.target.files));
   drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
   drop.addEventListener("dragleave", () => drop.classList.remove("over"));
   drop.addEventListener("drop", (e) => {
     e.preventDefault();
     drop.classList.remove("over");
-    droppedFiles(e.dataTransfer).then((files) => setFiles(kind, files));
+    droppedFiles(e.dataTransfer).then(addFiles);
   });
 }
 

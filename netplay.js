@@ -247,7 +247,8 @@
         if (!rtts.length) return 2;
         // Guest-to-guest inputs go through the host, so the worst path is the two slowest links.
         const oneWay = rtts.length > 1 ? (rtts[0] + rtts[1]) / 2 : rtts[0] / 2;
-        return Math.min(10, Math.max(1, Math.ceil((oneWay + 12) / FRAME_MS)));
+        // At least 2 frames: with 1, any hiccup on either machine stalls the other at once.
+        return Math.min(10, Math.max(2, Math.ceil((oneWay + 12) / FRAME_MS)));
     }
 
     // ---------- transport ----------
@@ -274,7 +275,7 @@
         switch (msg.t) {
             case "welcome":
                 net.mySlot = msg.slot;
-                ui.status("Joined as P" + (msg.slot + 1) + ". Waiting for the host to start…");
+                ui.status("Joined as P" + (msg.slot + 1) + ". Starting…");
                 ui.refresh();
                 break;
             case "full":
@@ -362,6 +363,11 @@
                 wire(c);
                 send(c.ctl, { t: "welcome", slot: c.slot });
                 lobbyUpdate();
+                // Start (or re-sync, to bring the newcomer in) shortly after someone joins,
+                // so nobody has to press anything. Joins close together share one start.
+                ui.status("P" + (c.slot + 1) + " joined. Starting the online match…", 4000);
+                clearTimeout(net.autoStart);
+                net.autoStart = setTimeout(() => startMatch(net.session ? "join" : "start"), 2500);
             });
             conn.on("close", () => dropConn(conn.peer));
             conn.on("error", () => dropConn(conn.peer));
@@ -477,14 +483,15 @@
             let html;
             if (!net.role) {
                 html = '<button id="net-host">Host an online game</button>' +
-                    '<p class="net-note">Friends join with a link. Everyone needs their own copy of the game (the same disc image) and the real BIOS.</p>';
+                    '<p class="net-note">You get a link to send. Friends who open it and load the game join your match automatically. Everyone needs the same disc image and the BIOS files.</p>';
             } else if (net.role === "host") {
                 html = (net.peer && net.peer.open
                     ? '<p>Room <b>' + net.code + '</b>. Send your friends this link:</p><p class="net-link"><input readonly value="' + link + '"><button id="net-copy">Copy</button></p>'
                     : "<p>Opening a room…</p>") +
                     "<ul>" + rows + "</ul>" +
                     '<p class="net-row">Input delay: <button id="net-dminus">−</button> <b>' + (net.delayOverride || "auto (" + chooseDelay() + ")") + '</b> <button id="net-dplus">+</button></p>' +
-                    '<button id="net-start"' + (net.conns.size ? "" : " disabled") + ">" + (net.session ? "Restart match sync" : "Start online match") + "</button>" +
+                    '<p class="net-note">Friends join automatically when they open the link and their game starts.</p>' +
+                    (net.session ? '<button id="net-start">Re-sync everyone</button>' : "") +
                     '<button id="net-leave" class="secondary">Close room</button>';
             } else {
                 html = "<p>Room <b>" + net.code + "</b></p><ul>" + rows + "</ul>" +
@@ -496,7 +503,7 @@
             on("net-copy", () => navigator.clipboard && navigator.clipboard.writeText(link));
             on("net-start", () => startMatch("start"));
             on("net-leave", leave);
-            on("net-dminus", () => { net.delayOverride = Math.max(1, (net.delayOverride || chooseDelay()) - 1); ui.refresh(); });
+            on("net-dminus", () => { net.delayOverride = Math.max(2, (net.delayOverride || chooseDelay()) - 1); ui.refresh(); });
             on("net-dplus", () => { net.delayOverride = Math.min(10, (net.delayOverride || chooseDelay()) + 1); ui.refresh(); });
         },
     };
@@ -519,6 +526,8 @@
         if (/Basic Render Driver|SwiftShader|llvmpipe|softpipe|Software/i.test(renderer)) {
             const w = document.getElementById("gpu-warning");
             if (w) w.hidden = false;
+            // Drawing in software: a quarter of the pixels keeps the game playable.
+            window.EJS_emulator.gameManager.setVariable("reicast_internal_resolution", "320x240");
         }
         // ?hud=1: also show the emulator's own timing HUD (drawn by the core) and the GPU in use.
         let gpu = "";
