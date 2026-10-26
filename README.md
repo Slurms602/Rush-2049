@@ -26,12 +26,14 @@ browser keeps a private copy, so next time it boots straight away.
    friends.
 2. **Friends:** open the link, pick their game and BIOS files, press Start. They join the
    room automatically.
-3. **Host:** once everyone is listed, press **Start online match**. Everyone's game jumps to
-   the host's current screen, and from then on all copies run in lockstep.
+3. A couple of seconds after a friend's game connects, the match starts by itself: everyone's
+   game jumps to the host's current screen, and from then on all copies run in lockstep.
+   Friends who join later are brought in the same way.
 
-The input delay (shown in the Online panel) is set from everyone's ping, typically 2 to 4
-frames between friends in the same region; the host can adjust it before starting. If a
-copy ever drifts out of sync, the host's game state is re-sent automatically.
+The input delay is set from everyone's ping, at least 2 frames; the host can change it in the
+Online panel and press **Re-sync everyone**. The panel also shows each friend's ping, whether
+the link is direct or relayed, and their fps. If a copy drifts out of sync, or a player stops
+responding for 5 seconds, the host's game state is re-sent automatically.
 
 In a split-screen race each player sees only their own view, enlarged to fill the window
 (the "Show all views" button switches back). Rush 2049's multiplayer starts from the START GAME
