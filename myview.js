@@ -23,6 +23,7 @@
 
     const view = { on: true, layout: null, pending: null, count: 0, frames: 0 };
     window.DC_VIEW = view;
+    view.detect = () => detect();   // for tests
 
     const canvas = () => window.EJS_emulator && window.EJS_emulator.canvas;
 
@@ -32,35 +33,58 @@
         return { x: (w - pw) / 2, y: (h - ph) / 2, w: pw, h: ph };
     }
 
+    const dark = (r, g, b) => r + g + b <= 60;
+    const menuBlue = (r, g, b) => b >= 120 && b > 2 * r && b > 2 * g;   // the outlines of the in-race menus
+
+    // Read the block of the picture between fractions x0..x1 and y0..y1 (y from the top).
+    // row(k) and col(i) give the share of pixels passing a test, row 0 being the top one.
+    function block(gl, r, x0, y0, x1, y1) {
+        const left = Math.round(r.x + x0 * r.w), bottom = Math.round(r.y + (1 - y1) * r.h);
+        const w = Math.max(1, Math.round(r.x + x1 * r.w) - left);
+        const h = Math.max(1, Math.round(r.y + (1 - y0) * r.h) - bottom);
+        const px = new Uint8Array(w * h * 4);
+        gl.readPixels(left, bottom, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        const share = (test, o, step, n) => {
+            let hit = 0;
+            for (let i = 0; i < n; i++, o += step) if (test(px[o], px[o + 1], px[o + 2])) hit++;
+            return hit / n;
+        };
+        return {
+            w, h,
+            row: (k, test, a = 0, b = 1) => {
+                const i0 = Math.floor(a * w), n = Math.max(1, Math.floor(b * w) - i0);
+                return share(test, ((h - 1 - k) * w + i0) * 4, 4, n);
+            },
+            col: (i, test) => share(test, i * 4, w * 4, h),
+        };
+    }
+
     function detect() {
         const gl = canvas().getContext("webgl2");
         const r = pictureRect(gl.drawingBufferWidth, gl.drawingBufferHeight);
-        const width = Math.max(1, Math.round(r.w));
-        const row = (fy) => {
-            const px = new Uint8Array(width * 4);
-            gl.readPixels(Math.round(r.x), Math.round(r.y + (1 - fy) * r.h), width, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-            return px;
-        };
-        // Nearly every pixel between fractions a and b of the row is black.
-        const dark = (px, a, b) => {
-            let bright = 0, n = 0;
-            for (let i = Math.floor(a * width); i < Math.floor(b * width); i++, n++) {
-                if (px[i * 4] + px[i * 4 + 1] + px[i * 4 + 2] > 60) bright++;
-            }
-            return bright <= n * 0.02;
-        };
-        // The gap is only a few pixels tall: read every pixel row in the band at once.
-        const y0 = Math.round(r.y + (1 - GAP[1]) * r.h), y1 = Math.round(r.y + (1 - GAP[0]) * r.h);
-        const band = new Uint8Array(width * (y1 - y0 + 1) * 4);
-        gl.readPixels(Math.round(r.x), y0, width, y1 - y0 + 1, gl.RGBA, gl.UNSIGNED_BYTE, band);
-        let gap = null;
-        for (let k = 0; k <= y1 - y0 && !gap; k++) {
-            const line = band.subarray(k * width * 4, (k + 1) * width * 4);
-            if (dark(line, 0.02, 0.40)) gap = line;
+        const read = (x0, y0, x1, y1) => block(gl, r, x0, y0, x1, y1);
+        // The gap is only a few pixels tall: read every pixel row in the band.
+        const band = read(0, GAP[0], 1, GAP[1]);
+        let gap = -1;
+        for (let k = 0; k < band.h && gap < 0; k++) if (band.row(k, dark, 0.02, 0.40) >= 0.98) gap = k;
+        if (gap < 0) return null;
+        if (read(0, 0.40, 1, 0.40).row(0, dark, 0.02, 0.40) >= 0.98
+            || read(0, 0.60, 1, 0.60).row(0, dark, 0.02, 0.40) >= 0.98) return null;   // a black screen, not a split
+        // The pause menu and its submenus are drawn over the split views as boxes with thin blue
+        // outlines across the middle of the picture: show the whole screen then.
+        const mid = read(0.44, 0, 0.56, 1);
+        let lines = 0;
+        for (let k = 0, run = 0; k <= mid.h; k++) {
+            if (k < mid.h && mid.row(k, menuBlue) >= 0.95) run++;
+            else { if (run && run <= mid.h * 0.02) lines++; run = 0; }
         }
-        if (!gap) return null;
-        if (dark(row(0.40), 0.02, 0.40) || dark(row(0.60), 0.02, 0.40)) return null;   // a black screen, not a split
-        return dark(gap, 0.80, 0.98) ? "quads" : "halves";
+        if (lines >= 2) return null;
+        // Quadrants also have a black column down the middle (the 2-player race intro has a dark
+        // right-hand panel, so the gap row alone can't tell).
+        const centre = read(0.48, 0.10, 0.52, 0.40);
+        let column = false;
+        for (let i = 0; i < centre.w && !column; i++) column = centre.col(i, dark) >= 0.95;
+        return column && band.row(gap, dark, 0.80, 0.98) >= 0.98 ? "quads" : "halves";
     }
 
     function apply() {

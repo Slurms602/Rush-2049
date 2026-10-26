@@ -36,8 +36,9 @@ the link is direct or relayed, and their fps. If a copy drifts out of sync, or a
 responding for 5 seconds, the host's game state is re-sent automatically.
 
 In a split-screen race each player sees only their own view, enlarged to fill the window
-(the "Show all views" button switches back). Rush 2049's multiplayer starts from the START GAME
-menu: set PLAYERS to 2-4 with the D-pad, then each player picks "Just Play".
+(the "Show all views" button switches back); menus, including the pause menu, show the whole
+screen. Rush 2049's multiplayer starts from the START GAME menu: set PLAYERS to 2-4 with the
+D-pad, then each player picks "Just Play".
 
 Keep the game tab in front: a hidden tab pauses, and everyone waits for it.
 
