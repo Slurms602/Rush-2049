@@ -1,0 +1,19 @@
+# Your games, BIOS and local paths never leave this machine.
+config.json
+bios/*
+!bios/README.md
+*.cue
+*.gdi
+*.cdi
+*.chd
+*.bin
+*.iso
+*.7z
+*.zip
+
+# Raw core build (it's packaged into ejs/data/cores/flycast-wasm.data)
+flycast_libretro.js
+flycast_libretro.wasm
+
+.DS_Store
+__pycache__/

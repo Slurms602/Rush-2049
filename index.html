@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rush 2049 Online</title>
+<!-- GitHub Pages can't send COOP/COEP headers; this service worker adds them (no-op under serve.py). -->
+<script src="coi-serviceworker.js"></script>
+<script src="vendor/peerjs.min.js"></script>
+<script src="netplay.js"></script>
+<style>
+  :root { --bg: #0d0f14; --panel: #161a22; --line: #2a3140; --text: #e6e9ef; --muted: #8a93a6; --accent: #f08a24; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+  #setup { max-width: 640px; margin: 0 auto; padding: 40px 16px; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  h1 span { color: var(--accent); }
+  p.sub { margin: 0 0 28px; color: var(--muted); }
+  .drop { display: block; border: 2px dashed var(--line); border-radius: 12px; padding: 22px; margin-bottom: 14px; background: var(--panel); cursor: pointer; transition: border-color .15s; }
+  .drop:hover, .drop.over { border-color: var(--accent); }
+  .drop strong { display: block; }
+  .drop small { color: var(--muted); }
+  .drop .files { white-space: pre-line; margin-top: 8px; font-family: ui-monospace, monospace; font-size: 13px; color: var(--accent); word-break: break-all; }
+  .drop input { display: none; }
+  button { width: 100%; padding: 14px; border: 0; border-radius: 10px; background: var(--accent); color: #111; font-size: 16px; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .4; cursor: default; }
+  button.secondary { margin-top: 10px; background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .remember { display: flex; gap: 8px; align-items: flex-start; margin: 4px 0 14px; color: var(--muted); font-size: 14px; cursor: pointer; }
+  .remember input { margin-top: 3px; accent-color: var(--accent); }
+  .err { color: #ff6b6b; margin-top: 12px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 28px; font-size: 14px; }
+  td { padding: 4px 0; border-bottom: 1px solid var(--line); }
+  td:first-child { font-family: ui-monospace, monospace; color: var(--accent); width: 40%; }
+  #game-wrap { display: none; position: fixed; inset: 0; background: #000; touch-action: none; }
+  .touch-only { display: none; }
+  body.mobile .touch-only { display: table; }
+  body.mobile .keys-only { display: none; }
+  .note { color: var(--muted); margin-top: 12px; font-size: 14px; }
+  @media (max-width: 480px) { #setup { padding-top: 24px; } .drop { padding: 16px; } }
+  #game { width: 100%; height: 100%; }
+  #net-toggle { position: fixed; top: 10px; right: 10px; z-index: 20; width: auto; padding: 6px 12px; font-size: 13px; opacity: .75; }
+  #net-toggle:hover { opacity: 1; }
+  #net-panel { position: fixed; top: 46px; right: 10px; z-index: 20; width: min(340px, calc(100vw - 32px)); padding: 14px; border-radius: 12px;
+    background: var(--panel); border: 1px solid var(--line); font-size: 14px; }
+  #net-panel p { margin: 0 0 10px; }
+  #net-panel ul { margin: 0 0 12px; padding-left: 18px; }
+  #net-panel button { padding: 9px; font-size: 14px; }
+  .net-note { color: var(--muted); font-size: 13px; margin-top: 10px !important; }
+  .net-link { display: flex; gap: 6px; }
+  .net-link input { flex: 1; min-width: 0; padding: 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: 12px ui-monospace, monospace; }
+  .net-link button { width: auto; }
+  .net-row button { width: 32px; padding: 2px; }
+  #net-status { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 20; padding: 6px 14px; border-radius: 8px;
+    background: rgba(0,0,0,.7); color: #fff; font-size: 14px; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
+  .join-banner { padding: 12px 14px; border-radius: 10px; background: var(--panel); border: 1px solid var(--accent); margin-bottom: 18px; }
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>Rush 2049 <span>Online</span></h1>
+  <p class="sub">San Francisco Rush 2049 (Dreamcast) in your browser, with online play. Your files stay on your device and are never uploaded anywhere.</p>
+  <div class="join-banner" id="join-banner" hidden></div>
+
+  <label class="drop" id="rom-drop">
+    <strong>1. Game image</strong>
+    <small>.chd or .cdi (one file), .gdi plus all its track files (select them together), or a .zip/.7z containing them</small>
+    <input type="file" id="rom" multiple>
+    <div class="files" id="rom-list"></div>
+  </label>
+
+  <label class="drop" id="bios-drop">
+    <strong>2. BIOS (optional)</strong>
+    <small>dc_boot.bin + dc_flash.bin from your own Dreamcast. Without them Flycast's built-in HLE BIOS is used, which runs most games.</small>
+    <input type="file" id="bios" multiple>
+    <div class="files" id="bios-list"></div>
+  </label>
+
+  <label class="remember"><input type="checkbox" id="remember" checked> Remember this game on this device and start it automatically next time</label>
+  <button id="start" disabled>Start</button>
+  <button id="forget" class="secondary" hidden>Forget saved game</button>
+  <div class="err" id="err"></div>
+  <div class="note" id="note"></div>
+
+  <table class="keys-only">
+    <tr><td>W A S D</td><td>Analog stick (move)</td></tr>
+    <tr><td>Arrow keys</td><td>D-pad</td></tr>
+    <tr><td>J / K / L / I</td><td>A / B / X / Y</td></tr>
+    <tr><td>Q / E</td><td>L / R triggers (camera)</td></tr>
+    <tr><td>Enter</td><td>Start</td></tr>
+    <tr><td>Gamepad</td><td>Plug in and press a button; works automatically</td></tr>
+  </table>
+  <table class="touch-only">
+    <tr><td>Left side</td><td>Analog stick (bottom), D-pad (top)</td></tr>
+    <tr><td>Right side</td><td>A / B / X / Y</td></tr>
+    <tr><td>Top corners</td><td>L / R triggers</td></tr>
+    <tr><td>Bluetooth pad</td><td>Pair it with your phone; works automatically</td></tr>
+    <tr><td>Tip</td><td>Play in landscape. A single .chd file loads fastest and uses the least memory.</td></tr>
+  </table>
+</div>
+
+<div id="game-wrap"><div id="game"></div>
+  <button id="net-toggle" hidden>Online</button>
+  <div id="net-panel" hidden><div id="net-body"></div></div>
+  <div id="net-status" hidden></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const picked = { rom: [], bios: [] };
+const JOIN = new URLSearchParams(location.search).get("join");
+if (JOIN) {
+  $("join-banner").hidden = false;
+  $("join-banner").textContent = "Joining online room " + JOIN.toUpperCase() + ". Pick your copy of the game and the BIOS, then press Start.";
+}
+
+// Touch device (phone/tablet, including iPadOS which reports a desktop user agent).
+const MOBILE = (navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches)
+  || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+document.body.classList.toggle("mobile", MOBILE);
+
+if (!window.crossOriginIsolated) {
+  $("err").textContent = "Not cross-origin isolated yet. Reload the page once; if it persists, your browser blocked the "
+    + "service worker (e.g. private browsing). Running locally? Use serve.py instead of opening the file.";
+}
+
+// Browsers keep audio muted until the first user gesture; resume any contexts the core created.
+const audioContexts = [];
+for (const name of ["AudioContext", "webkitAudioContext"]) {
+  const Orig = window[name];
+  if (!Orig) continue;
+  window[name] = class extends Orig { constructor(...a) { super(...a); audioContexts.push(this); } };
+}
+const resumeAudio = () => audioContexts.forEach(c => c.state === "suspended" && c.resume());
+["keydown", "pointerdown", "touchstart"].forEach(t => window.addEventListener(t, resumeAudio, true));
+
+// A file served by serve.py, shaped like a File (name, size, arrayBuffer) so the patch treats both alike.
+function localFile(f) {
+  return {
+    name: f.name,
+    size: f.size,
+    async arrayBuffer(onProgress) {
+      const res = await fetch(f.url);
+      if (!res.ok) throw new Error("Could not load " + f.name + " (" + res.status + ")");
+      const buf = new Uint8Array(f.size), reader = res.body.getReader();
+      let off = 0, last = -1;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf.set(value, off);
+        off += value.length;
+        const pct = Math.floor(off * 100 / f.size);
+        if (onProgress && pct !== last) onProgress(last = pct);
+      }
+      return buf.buffer;
+    }
+  };
+}
+
+function setFiles(kind, list) {
+  picked[kind] = Array.from(list);
+  $(kind + "-list").textContent = picked[kind].map(f => f.name + "  (" + (f.size / 1048576).toFixed(1) + " MB)").join("\n");
+  $("start").disabled = !(picked.rom.length && biosReady());
+  const romMB = picked.rom.reduce((n, f) => n + f.size, 0) / 1048576;
+  $("note").textContent = MOBILE && romMB > 700
+    ? `This image is ${Math.round(romMB)} MB. Phones can run out of memory on images this big; a .chd version is much smaller.`
+    : "";
+}
+
+for (const kind of ["rom", "bios"]) {
+  const drop = $(kind + "-drop");
+  $(kind).addEventListener("change", (e) => setFiles(kind, e.target.files));
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); setFiles(kind, e.dataTransfer.files); });
+}
+
+function controls() {
+  const pad = ["BUTTON_2","BUTTON_4","SELECT","START","DPAD_UP","DPAD_DOWN","DPAD_LEFT","DPAD_RIGHT",
+    "BUTTON_1","BUTTON_3","LEFT_TOP_SHOULDER","RIGHT_TOP_SHOULDER","LEFT_BOTTOM_SHOULDER","RIGHT_BOTTOM_SHOULDER",
+    "LEFT_STICK","RIGHT_STICK","LEFT_STICK_X:+1","LEFT_STICK_X:-1","LEFT_STICK_Y:+1","LEFT_STICK_Y:-1",
+    "RIGHT_STICK_X:+1","RIGHT_STICK_X:-1","RIGHT_STICK_Y:+1","RIGHT_STICK_Y:-1"];
+  // RetroPad slot -> key. Flycast maps RetroPad B/A/Y/X to Dreamcast A/B/X/Y and L2/R2 to the triggers.
+  const keys = { 0: "j", 1: "l", 3: "enter", 4: "up arrow", 5: "down arrow", 6: "left arrow", 7: "right arrow",
+    8: "k", 9: "i", 12: "q", 13: "e", 16: "d", 17: "a", 18: "s", 19: "w" };
+  const p1 = {};
+  pad.forEach((v2, i) => { p1[i] = { value: keys[i] || "", value2: v2 }; });
+  return { 0: p1, 1: {}, 2: {}, 3: {} };
+}
+
+// A real BIOS is optional (HLE is used without one), but if one is given it needs both files.
+function biosReady() {
+  const bios = picked.bios.map(f => f.name.toLowerCase());
+  return !bios.length || (bios.includes("dc_boot.bin") && bios.includes("dc_flash.bin"));
+}
+
+// Auto-run: when serve.py was given a game (config.json or --game), boot it straight away.
+// Saved game: copies of the picked files kept in this browser's private storage (the
+// origin private file system) on this device only, so later visits boot without picking.
+// Open the page with ?pick to choose a different game instead.
+const saved = {
+  async dir(kind, create) {
+    const root = await navigator.storage.getDirectory();
+    return root.getDirectoryHandle(kind, { create });
+  },
+  supported: !!(navigator.storage && navigator.storage.getDirectory && window.FileSystemFileHandle
+    && "createWritable" in FileSystemFileHandle.prototype),
+  async load() {
+    const out = { rom: [], bios: [] };
+    for (const kind of ["rom", "bios"]) {
+      try {
+        for await (const handle of (await this.dir(kind, false)).values()) out[kind].push(await handle.getFile());
+      } catch (e) {}  // nothing saved yet
+    }
+    return out;
+  },
+  async clear() {
+    const root = await navigator.storage.getDirectory();
+    for (const kind of ["rom", "bios"]) await root.removeEntry(kind, { recursive: true }).catch(() => {});
+  },
+  async save(files) {
+    if (navigator.storage.persist) await navigator.storage.persist().catch(() => {});
+    await this.clear();
+    for (const kind of ["rom", "bios"]) {
+      const dir = await this.dir(kind, true);
+      for (const file of files[kind]) {
+        const w = await (await dir.getFileHandle(file.name, { create: true })).createWritable();
+        await w.write(file);  // streams from disk; a 1 GB+ track never sits in memory twice
+        await w.close();
+      }
+    }
+  }
+};
+if (!saved.supported) $("remember").closest("label").hidden = true;
+
+async function autoStart() {
+  // serve.py with a configured game takes priority.
+  const auto = await fetch("autorun.json").then(r => r.ok ? r.json() : null).catch(() => null);
+  if (auto && auto.game.length) {
+    setFiles("rom", auto.game.map(localFile));
+    if (auto.bios.length) setFiles("bios", auto.bios.map(localFile));
+    if (biosReady()) start();
+    else $("err").textContent = "The bios/ folder needs both dc_boot.bin and dc_flash.bin (or neither, to use the HLE BIOS).";
+    return;
+  }
+  if (!saved.supported) return;
+  const files = await saved.load();
+  if (!files.rom.length) return;
+  $("forget").hidden = false;
+  if (new URLSearchParams(location.search).has("pick")) return;
+  setFiles("rom", files.rom);
+  setFiles("bios", files.bios);
+  if (biosReady()) start({ fromSaved: true });
+}
+autoStart();
+
+$("start").addEventListener("click", () => start());
+$("forget").addEventListener("click", async () => {
+  await saved.clear();
+  $("forget").hidden = true;
+  $("note").textContent = "Saved game removed from this device.";
+});
+
+// On-screen Dreamcast pad. input_value is the RetroPad slot (see controls()): Flycast maps
+// RetroPad B/A/Y/X to Dreamcast A/B/X/Y and L2/R2 to the analog triggers.
+function touchLayout() {
+  return [
+    { type: "zone", id: "stick", location: "left", left: "50%", top: "100%", joystickInput: true, inputValues: [16, 17, 18, 19] },
+    { type: "zone", id: "dpad", location: "left", left: "50%", top: "0%", joystickInput: false, inputValues: [4, 5, 6, 7] },
+    { type: "button", text: "Y", id: "y", location: "right", left: 40, bold: true, input_value: 9 },
+    { type: "button", text: "X", id: "x", location: "right", top: 40, bold: true, input_value: 1 },
+    { type: "button", text: "B", id: "b", location: "right", left: 81, top: 40, bold: true, input_value: 8 },
+    { type: "button", text: "A", id: "a", location: "right", left: 40, top: 80, bold: true, input_value: 0 },
+    { type: "button", text: "L", id: "l", location: "top", left: 10, top: -40, bold: true, block: true, input_value: 12 },
+    { type: "button", text: "R", id: "r", location: "top", right: 70, top: -40, bold: true, block: true, input_value: 13 },
+    { type: "button", text: "Start", id: "start", location: "center", left: 30, fontSize: 15, block: true, input_value: 3 }
+  ];
+}
+
+function start({ fromSaved = false } = {}) {
+  // Real File objects (not serve.py's) can be remembered. Copy in the background while the
+  // game loads; it reads the same files, so nothing needs to wait.
+  if (!fromSaved && saved.supported && $("remember").checked && picked.rom.every(f => f instanceof File)) {
+    saved.save({ rom: picked.rom, bios: picked.bios })
+      .then(() => console.log("[dc] saved game for next time"))
+      .catch(e => { console.warn("[dc] couldn't save game:", e); saved.clear(); });
+  }
+  if (MOBILE) {
+    window.DC_MOBILE = true;
+    window.EJS_VirtualGamepadSettings = touchLayout();
+    // Fullscreen + landscape need the tap that started the game, so request them right away.
+    const el = document.documentElement;
+    (el.requestFullscreen ? el.requestFullscreen() : Promise.reject())
+      .then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock("landscape"))
+      .catch(() => {});
+  }
+  window.DC_FILES = { rom: picked.rom, bios: picked.bios };
+  const main = picked.rom.find(f => /\.(gdi|cdi|chd|cue)$/i.test(f.name)) || picked.rom[0];
+
+  window.EJS_player = "#game";
+  window.EJS_core = "flycast";
+  window.EJS_pathtodata = "ejs/data/";
+  window.EJS_gameUrl = "dreamcast-game";   // placeholder; dc-patches.js supplies the real files
+  window.EJS_gameName = main.name.replace(/\.[^.]+$/, "");
+  window.EJS_DEBUG_XX = true;              // load unminified sources (no build step needed)
+  window.EJS_startOnLoaded = true;
+  window.EJS_onGameStart = () => {
+    $("net-toggle").hidden = false;
+    $("net-toggle").onclick = () => { $("net-panel").hidden = !$("net-panel").hidden; };
+    if (JOIN) $("net-panel").hidden = false;
+    window.DC_NET.init();
+  };
+  window.EJS_threads = false;
+  window.EJS_defaultControls = controls();
+  window.EJS_defaultOptions = {
+    reicast_boot_to_bios: "disabled",
+    reicast_threaded_rendering: "disabled",
+    reicast_internal_resolution: "640x480",
+    reicast_alpha_sorting: "per-strip (fast, least accurate)"
+  };
+
+  $("setup").style.display = "none";
+  $("game-wrap").style.display = "block";
+  const s = document.createElement("script");
+  s.src = "ejs/data/loader.js";
+  document.body.appendChild(s);
+}
+</script>
+</body>
+</html>
