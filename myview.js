@@ -42,7 +42,9 @@
     }
 
     const dark = (r, g, b) => r + g + b <= 60;
-    const menuBlue = (r, g, b) => b >= 120 && b > 2 * r && b > 2 * g;   // the outlines of the in-race menus
+    // Menu outlines are deep blue (including b=132). Require little red so thin
+    // purple sky bands (about r=41, g=32, b=123) are not mistaken for a pause menu.
+    const menuBlue = (r, g, b) => b >= 120 && b > 4 * r && b > 2 * g;
 
     // Where each region lies in the drawing buffer, and where its pixels go in one byte array.
     function regionsOf(gl) {

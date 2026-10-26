@@ -7,8 +7,16 @@
 (function () {
     "use strict";
     const ROOM_PREFIX = "rush2049-";
-    const VERSION = 2;           // players must run the same netplay code; bump on protocol changes
+    const VERSION = 3;           // players must run the same netplay code; bump on protocol changes
     const MAX_PLAYERS = 4;
+    const trackFingerprint = () => window.DC_TRACK ? window.DC_TRACK.fingerprint : "original";
+    function trackReady() {
+        if (window.DC_TRACK && !window.DC_TRACK.ready) {
+            ui.status("Wait for the custom track to finish loading before going online.", 8000);
+            return false;
+        }
+        return true;
+    }
     const HASH_EVERY = 120;      // frames between desync checks
     const FIRST_HASH = 30;       // early check right after a state load
     const RESEND = 8;            // frames of history repeated in each input packet
@@ -288,13 +296,13 @@
             net.waiting = true;   // no more frames until everyone has the new state
             const state = gm().getState();
             const data = await gzip(state);
-            const active = [0, ...[...net.conns.values()].filter((c) => c.slot > 0 && c.ctl.open).map((c) => c.slot)].sort();
+            const active = [0, ...[...net.conns.values()].filter((c) => c.accepted && c.slot > 0 && c.ctl.open).map((c) => c.slot)].sort();
             const delay = net.delayOverride || (net.session ? net.delay : chooseDelay());
             const names = {};
             for (const s of active) names[s] = "P" + (s + 1);
             for (const c of net.conns.values()) {
-                if (!c.ctl.open || !active.includes(c.slot)) continue;
-                send(c.ctl, { t: "start", epoch, delay, active, reason });
+                if (!c.accepted || !c.ctl.open || !active.includes(c.slot)) continue;
+                send(c.ctl, { t: "start", epoch, delay, active, reason, track: trackFingerprint() });
                 send(c.ctl, { t: "state", epoch, data });
             }
             begin(state, epoch, delay, active);
@@ -365,7 +373,7 @@
     // link's ping; guest to guest is direct when the two are linked, else through the host.
     // Pings are medians of recent samples, plus their spread (jitter) as headroom.
     function chooseDelay() {
-        const guests = [...net.conns.values()].filter((c) => c.ctl.open && c.slot > 0);
+        const guests = [...net.conns.values()].filter((c) => c.accepted && c.ctl.open && c.slot > 0);
         if (!guests.length) return 2;
         if (guests.some((c) => !c.rtts || c.rtts.length < 3)) return 4;   // no reliable pings yet
         const slow = (c) => c.rtt + c.jitter;
@@ -425,6 +433,7 @@
     }
 
     function onControl(c, msg) {
+        if (!c.accepted && !["welcome", "version", "full", "track-mismatch"].includes(msg.t)) return;
         switch (msg.t) {
             case "welcome":
                 if (msg.v !== VERSION) {
@@ -432,12 +441,22 @@
                     leave();
                     break;
                 }
+                if (msg.track !== trackFingerprint()) {
+                    ui.status("The host is using a different track build. Open their invite link and reload the page.", 15000);
+                    leave();
+                    break;
+                }
+                c.accepted = true;
                 net.mySlot = msg.slot;
                 ui.status("Joined as P" + (msg.slot + 1) + ". Starting…");
                 ui.refresh();
                 break;
             case "version":
                 ui.status("This page is out of date. Reload it (Ctrl+F5), then open the link again.", 15000);
+                leave();
+                break;
+            case "track-mismatch":
+                ui.status("This room is using a different track build. Open the host's invite link and reload the page.", 15000);
                 leave();
                 break;
             case "full":
@@ -453,6 +472,11 @@
                 if (msg.e === net.epoch) { net.delay = msg.d; ui.refresh(); }
                 break;
             case "start":
+                if (msg.track !== trackFingerprint()) {
+                    ui.status("The host's track differs from yours. Reopen their invite link.", 15000);
+                    leave();
+                    break;
+                }
                 net.pending = msg;
                 net.waiting = true;
                 ui.status("Loading the host's game state…");
@@ -552,7 +576,7 @@
 
     // ---------- host ----------
     function host() {
-        if (net.role) return;
+        if (net.role || !trackReady()) return;
         hookInput();
         net.role = "host";
         net.mySlot = 0;
@@ -582,8 +606,16 @@
                     return;
                 }
                 if (c.slot >= MAX_PLAYERS) { send(c.ctl, { t: "full" }); setTimeout(() => dropConn(conn.peer), 500); return; }
+                if (c.ctl.metadata.track !== trackFingerprint()) {
+                    ui.status("A friend has a different track build. Send them this room's invite link and ask them to reload.", 10000);
+                    send(c.ctl, { t: "track-mismatch" });
+                    setTimeout(() => dropConn(conn.peer), 1000);
+                    return;
+                }
+                if (c.accepted) return;
+                c.accepted = true;
                 wire(c);
-                send(c.ctl, { t: "welcome", slot: c.slot, v: VERSION });
+                send(c.ctl, { t: "welcome", slot: c.slot, v: VERSION, track: trackFingerprint() });
                 lobbyUpdate();
                 // Start (or re-sync, to bring the newcomer in) shortly after someone joins,
                 // so nobody has to press anything. Joins close together share one start.
@@ -618,7 +650,7 @@
     }
 
     function lobbyUpdate() {
-        const players = [{ slot: 0 }, ...[...net.conns.entries()].filter(([, c]) => c.ctl && c.ctl.open).map(([id, c]) => ({ slot: c.slot, id }))];
+        const players = [{ slot: 0 }, ...[...net.conns.entries()].filter(([, c]) => c.accepted && c.ctl && c.ctl.open).map(([id, c]) => ({ slot: c.slot, id }))];
         net.lobby = players;
         for (const c of net.conns.values()) send(c.ctl, { t: "lobby", players });
         ui.refresh();
@@ -626,7 +658,7 @@
 
     // ---------- guest ----------
     function join(code) {
-        if (net.role) return;
+        if (net.role || !trackReady()) return;
         hookInput();
         net.role = "guest";
         net.code = code.toUpperCase();
@@ -638,7 +670,7 @@
         net.peer.on("open", () => {
             const id = ROOM_PREFIX + net.code;
             const c = { slot: 0, rtt: 0 };
-            c.ctl = net.peer.connect(id, { label: "ctl", reliable: true, metadata: { v: VERSION } });
+            c.ctl = net.peer.connect(id, { label: "ctl", reliable: true, metadata: { v: VERSION, track: trackFingerprint() } });
             c.inp = net.peer.connect(id, { label: "inp", reliable: false, serialization: "json" });
             net.conns.set(id, c);
             let opened = 0;
@@ -733,7 +765,10 @@
         refresh() {
             const panel = document.getElementById("net-panel");
             if (!panel) return;
-            const link = location.origin + location.pathname + "?join=" + net.code;
+            const invite = new URL(location.origin + location.pathname);
+            invite.searchParams.set("join", net.code);
+            if (window.DC_TRACK && window.DC_TRACK.id !== "original") invite.searchParams.set("track", window.DC_TRACK.id);
+            const link = invite.href;
             const rows = (net.lobby || [{ slot: net.mySlot }]).map((p) => {
                 const c = peerOfSlot(p.slot) || net.mesh.get(p.slot);
                 const r = c && c.remote;

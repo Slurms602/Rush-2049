@@ -7,9 +7,10 @@
 <!-- GitHub Pages can't send COOP/COEP headers; this service worker adds them (no-op under serve.py). -->
 <script src="coi-serviceworker.js"></script>
 <script src="vendor/peerjs.min.js"></script>
-<script src="netplay.js?v=2"></script>
-<script src="myview.js?v=2"></script>
-<script src="mods.js?v=2"></script>
+<script src="netplay.js?v=3"></script>
+<script src="myview.js?v=3"></script>
+<script src="mods.js?v=3"></script>
+<script src="track-loader.js?v=3"></script>
 <style>
   :root { --bg: #0d0f14; --panel: #161a22; --line: #2a3140; --text: #e6e9ef; --muted: #8a93a6; --accent: #f08a24; }
   * { box-sizing: border-box; }
@@ -62,6 +63,14 @@
     padding: 12px 14px; border-radius: 10px; background: #3a1d12; border: 1px solid var(--accent); color: var(--text); font-size: 14px; }
   #gpu-warning button { width: auto; margin-top: 8px; padding: 6px 14px; font-size: 13px; }
   .join-banner { padding: 12px 14px; border-radius: 10px; background: var(--panel); border: 1px solid var(--accent); margin-bottom: 18px; }
+  .track-choice { display: block; margin: 0 0 18px; }
+  .track-choice select { display: block; width: 100%; margin: 6px 0; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; }
+  .track-choice small { color: var(--muted); }
+  #track-panel { position: fixed; top: 50px; right: 10px; z-index: 22; width: min(350px, calc(100vw - 20px)); background: var(--panel); border: 1px solid var(--line); padding: 16px; border-radius: 12px; }
+  #track-panel p { margin: 0 0 12px; }
+  #track-panel button { margin-top: 8px; }
+  #track-hint { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 20; max-width: calc(100vw - 24px); padding: 6px 12px; border-radius: 8px; background: rgba(0,0,0,.8); color: var(--text); font-size: 13px; text-align: center; }
+  #track-error { position: fixed; inset: 20%; z-index: 30; padding: 24px; background: var(--panel); border: 1px solid #ff6b6b; border-radius: 12px; overflow: auto; }
 </style>
 </head>
 <body>
@@ -69,6 +78,11 @@
   <h1>Rush 2049 <span>Online</span></h1>
   <p class="sub">San Francisco Rush 2049 (Dreamcast) in your browser, with online play. Your files stay on your device and are never uploaded anywhere.</p>
   <div class="join-banner" id="join-banner" hidden></div>
+
+  <label class="track-choice">Track collection
+    <select id="track-select"><option value="original">Original tracks</option><option value="neon-skyway">Neon Skyway — custom track</option></select>
+    <small id="track-description">Play the game's original tracks.</small>
+  </label>
 
   <label class="drop" id="rom-drop">
     <strong>Game files</strong>
@@ -103,7 +117,10 @@
 </div>
 
 <div id="game-wrap"><div id="game"></div>
-  <div id="game-buttons"><button id="my-view" hidden onclick="DC_VIEW.toggle()">Show all views</button><button id="change-game" hidden>Change game</button><button id="net-toggle" hidden>Online</button></div>
+  <div id="game-buttons"><button id="my-view" hidden onclick="DC_VIEW.toggle()">Show all views</button><button id="change-track" hidden>Tracks</button><button id="change-game" hidden>Change game</button><button id="net-toggle" hidden>Online</button></div>
+  <div id="track-panel" hidden><p id="track-current"></p><p>Changing tracks restarts the game and leaves your online room.</p><button id="play-neon">Play Neon Skyway</button><button id="play-original" class="secondary">Play original tracks</button><button id="close-tracks" class="secondary">Keep playing</button></div>
+  <div id="track-hint" hidden></div>
+  <div id="track-error" role="alert" hidden><b>Could not load the custom track</b><p id="track-error-text"></p><button onclick="location.reload()">Try again</button><button class="secondary" onclick="location.href=DC_TRACK.url('original')">Play original tracks</button></div>
   <div id="net-panel" hidden><div id="net-body"></div></div>
   <div id="net-status" hidden></div>
   <div id="fps"></div>
@@ -118,6 +135,27 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const picked = { rom: [], bios: [] };
+function showTrackChoice() {
+  $("track-select").value = DC_TRACK.id;
+  $("track-description").textContent = DC_TRACK.id === "original" ? "Play the game's original tracks."
+    : "Floating neon roads and banked turns. Select Marina (Track 1) in the game to race Neon Skyway. This preview replaces Track 1 while enabled.";
+  $("track-current").textContent = DC_TRACK.id === "original" ? "Currently playing: original tracks." : "Currently playing: Neon Skyway. Select Marina (Track 1) in the game.";
+  $("play-neon").disabled = DC_TRACK.id === "neon-skyway";
+  $("play-original").disabled = DC_TRACK.id === "original";
+}
+showTrackChoice();
+$("track-select").onchange = () => {
+  DC_TRACK.select($("track-select").value);
+  // Stay in the invited room and keep the game/BIOS files already picked in this form.
+  history.replaceState(null, "", DC_TRACK.url(DC_TRACK.id, {
+    pick: new URLSearchParams(location.search).has("pick"), leaveRoom: false
+  }));
+  showTrackChoice();
+};
+$("change-track").onclick = () => { $("track-panel").hidden = !$("track-panel").hidden; $("net-panel").hidden = true; };
+$("close-tracks").onclick = () => { $("track-panel").hidden = true; };
+$("play-neon").onclick = () => { location.href = DC_TRACK.url("neon-skyway"); };
+$("play-original").onclick = () => { location.href = DC_TRACK.url("original"); };
 const JOIN = new URLSearchParams(location.search).get("join");
 if (JOIN) {
   $("join-banner").hidden = false;
@@ -344,6 +382,21 @@ function touchLayout() {
 }
 
 function start({ fromSaved = false } = {}) {
+  if (window.DC_STARTING) return;
+  window.DC_STARTING = true;
+  // No emulated frame may read a track while its files are still being downloaded.
+  window.DC_LOOP = window.DC_LOOP || {};
+  window.DC_LOOP.pre = () => false;
+  const trackReady = DC_TRACK.prepare();
+  const trackFailed = (error) => {
+    window.DC_LOOP.pre = () => false;
+    $("track-error-text").textContent = error.message || String(error);
+    $("track-error").hidden = false;
+    $("net-toggle").hidden = true;
+    console.error("[track]", error);
+  };
+  // Handle errors immediately, even if the emulator is still downloading the disc.
+  trackReady.catch(trackFailed);
   // Real File objects (not serve.py's) can be remembered. Copy in the background while the
   // game loads; it reads the same files, so nothing needs to wait.
   if (!fromSaved && saved.supported && $("remember").checked && picked.rom.every(f => f instanceof File)) {
@@ -371,17 +424,28 @@ function start({ fromSaved = false } = {}) {
   window.EJS_gameName = main.name.replace(/\.[^.]+$/, "");
   window.EJS_DEBUG_XX = true;              // load unminified sources (no build step needed)
   window.EJS_startOnLoaded = true;
-  window.EJS_onGameStart = () => {
+  window.EJS_onGameStart = async () => {
+    try {
+      await trackReady;
+      await DC_TRACK.install();
+    } catch (error) { trackFailed(error); return; }
     $("net-toggle").hidden = false;
+    $("change-track").hidden = false;
     $("change-game").hidden = false;
     $("change-game").onclick = () => {
       const q = new URLSearchParams(location.search);
       q.set("pick", "");
       location.search = q.toString().replace("pick=", "pick");
     };
-    $("net-toggle").onclick = () => { $("net-panel").hidden = !$("net-panel").hidden; };
+    $("net-toggle").onclick = () => { $("net-panel").hidden = !$("net-panel").hidden; $("track-panel").hidden = true; };
     if (JOIN) $("net-panel").hidden = false;
     window.DC_NET.init();
+    if (DC_TRACK.id !== "original") {
+      $("track-hint").textContent = "Neon Skyway is ready — select Marina (Track 1) in the game.";
+      $("track-hint").hidden = false;
+      $("track-hint").onclick = () => { $("track-hint").hidden = true; };
+      setTimeout(() => { $("track-hint").hidden = true; }, 30000);
+    }
   };
   window.EJS_threads = false;
   window.EJS_defaultControls = controls();

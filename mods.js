@@ -11,14 +11,16 @@
 
     function read(lba, count) {
         const M = core(), ptr = M._malloc(count * SECTOR);
+        if (!ptr) throw new Error("Not enough memory to read the disc");
         try {
-            M._fly_disc_read(fad(lba), count, ptr);
+            if (M._fly_disc_read(fad(lba), count, ptr) !== count) throw new Error("Could not read the game disc");
             return M.HEAPU8.slice(ptr, ptr + count * SECTOR);
         } finally { M._free(ptr); }
     }
 
     function patch(lba, bytes) {
         const M = core(), count = Math.ceil(bytes.length / SECTOR), ptr = M._malloc(count * SECTOR);
+        if (!ptr) throw new Error("Not enough memory to install the track");
         try {
             M.HEAPU8.fill(0, ptr, ptr + count * SECTOR);
             M.HEAPU8.set(bytes, ptr);
@@ -28,13 +30,19 @@
 
     // The root directory: each file's name, extent, size and where its record sits.
     function rootDir() {
-        const pvd = new DataView(read(PVD_LBA, 1).buffer);
+        const raw = read(PVD_LBA, 1);
+        if (raw[0] !== 1 || String.fromCharCode(...raw.subarray(1, 6)) !== "CD001") {
+            throw new Error("Custom tracks need the Rush 2049 US GDI disc or a CHD made from it");
+        }
+        const pvd = new DataView(raw.buffer);
         const lba = pvd.getUint32(156 + 2, true), size = pvd.getUint32(156 + 10, true);
+        if (!lba || size < 34 || size > 1024 * 1024) throw new Error("Unsupported disc directory");
         const data = read(lba, Math.ceil(size / SECTOR));
         const records = [];
         for (let o = 0; o < size; ) {
             const len = data[o];
             if (!len) { o = (Math.floor(o / SECTOR) + 1) * SECTOR; continue; }
+            if (len < 34 || o + len > size || data[o + 32] > len - 33) throw new Error("Invalid disc directory record");
             const v = new DataView(data.buffer, o);
             const name = String.fromCharCode(...data.subarray(o + 33, o + 33 + data[o + 32])).split(";")[0];
             records.push({ off: o, name, lba: v.getUint32(2, true), size: v.getUint32(10, true) });
@@ -55,10 +63,20 @@
     function install(files) {
         if (!core()._fly_disc_patch_add) throw new Error("this core can't patch the disc");
         const dir = rootDir();
+        const planned = [], names = new Set();
         for (const f of files) {
-            const rec = dir.records.find((r) => r.name === f.name.toUpperCase());
+            if (typeof f.name !== "string" || !(f.data instanceof Uint8Array) || !f.data.length) throw new Error("Invalid track file");
+            const name = f.name.toUpperCase();
+            if (names.has(name)) throw new Error("Duplicate track file: " + name);
+            names.add(name);
+            const rec = dir.records.find((r) => r.name === name);
             if (!rec) throw new Error(f.name + " is not on the disc");
             if (f.data.length > Math.ceil(rec.size / SECTOR) * SECTOR) throw new Error(f.name + " is bigger than the original");
+            planned.push({ f, rec });
+        }
+        // Validate the whole bundle before changing any sectors. A bad last file must not
+        // leave the first four installed and let players unknowingly race a mixed track.
+        for (const { f, rec } of planned) {
             patch(rec.lba, f.data);
             setBoth(dir.data, rec.off + 10, f.data.length);
         }

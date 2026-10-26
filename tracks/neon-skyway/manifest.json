@@ -1,0 +1,34 @@
+{
+  "id": "neon-skyway",
+  "name": "Neon Skyway",
+  "version": 1,
+  "slot": 1,
+  "lengthFeet": 6948,
+  "files": [
+    {
+      "name": "TRACK1.LZS",
+      "bytes": 147170,
+      "sha256": "d3a7dc8f2d64bb4943139eeac7c2d9b9fe1f1f2d3392e651abcb4c8dcd7006d3"
+    },
+    {
+      "name": "TRACK1PATH.LZS",
+      "bytes": 10956,
+      "sha256": "d741f09d3707668af1a54c4d0b63d4018eec90dbbf42ff277c04ec1015d6e63d"
+    },
+    {
+      "name": "TRACK1PATHBACK.LZS",
+      "bytes": 10950,
+      "sha256": "134f86ddc3f3dc38ab4fd65e0110c8ffb7fba2af752907e5df0b794380e3b5a9"
+    },
+    {
+      "name": "TRACK1ROAD.LZS",
+      "bytes": 176661,
+      "sha256": "e2d1179fbf489747c15a79a22d195e3b3b05bc564981f1befd103fc0921959e0"
+    },
+    {
+      "name": "TRACK1WORLDS.LZS",
+      "bytes": 3175,
+      "sha256": "1a5e9686fc47a6c8caea8df66922b97c2fb9e4d7b94f3b66c109dd7c621b5338"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 # Your games, BIOS and local paths never leave this machine.
 config.json
+/last.txt
 bios/*
 !bios/README.md
 *.cue

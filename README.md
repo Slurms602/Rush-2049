@@ -7,6 +7,25 @@ inputs travel between browsers. Nothing is installed, and no game files are host
 
 Other Dreamcast games boot too, but online play has only been tested with Rush 2049.
 
+## Try Neon Skyway
+
+Open the site with `?track=neon-skyway`, or use the **Tracks** button and choose **Play
+Neon Skyway**. In the game, choose **Single Race → Marina (Track 1)**. This loads a new
+floating circuit with neon roads, banked turns, coins and a wing jump. Its files are
+downloaded automatically; your game image is never modified. **Play original tracks**
+restarts with the original disc content.
+
+For friends, reach the game's main menu before hosting, then use **Online → Host an
+online game**. The invite link includes the custom track selection. Each friend still
+needs their own game and BIOS. Players with different track files cannot join the same
+match. Set **PLAYERS** to 2–4 in the game's START GAME menu and accept **Just Play** on
+each controller before selecting the race.
+
+This first custom mode uses Marina's slot; its original name and preview remain in the
+game menu. A true seventh menu entry and a browser track editor are still future work.
+The editable layout and generated files are in [tracks/neon-skyway/](tracks/neon-skyway/).
+To build your own version, see the [track builder](tools/trackbuilder/README.md).
+
 ## What each player needs
 
 - **Their own copy of the game**, the same disc image as the host. A `.gdi` set or a
@@ -21,7 +40,8 @@ browser keeps a private copy, so next time it boots straight away.
 
 ## Playing online
 
-1. **Host:** open the site, pick the game and BIOS files, press Start. Click **Online** in
+1. **Host:** open the site, pick the game and BIOS files, press Start. Reach the game's
+   main menu, then click **Online** in
    the top-right corner, then **Host an online game**, and send the link it shows to your
    friends.
 2. **Friends:** open the link, pick their game and BIOS files, press Start. They join the
@@ -55,6 +75,9 @@ Keep the game tab in front: a hidden tab pauses, and everyone waits for it.
 | Enter | Start |
 
 Gamepads work automatically.
+
+During a race, **E** accelerates, **Q** brakes and **K** deploys the wings. The **Down
+arrow** cycles the camera; **Up arrow** aborts back to the road if you get stuck.
 
 ## Hosting the site
 
