@@ -18,12 +18,20 @@
         { x: 0.503, y: 0.4875, w: 0.494, h: 0.454 },
     ];
     const GAP = [0.474, 0.492]; // the black rows between the top and bottom views lie in here
-    const CHECK_EVERY = 20;     // frames between checks (reading pixels stalls the GPU briefly)
-    const CONFIRM = 3;          // same answer this many times in a row before switching
+    const CHECK_EVERY = 20;     // frames between checks
+    const CONFIRM = 2;          // same answer this many times in a row before switching
+
+    // Parts of the picture the check reads, as fractions [x0, y0, x1, y1] (y from the top).
+    const REGIONS = {
+        band: [0, GAP[0], 1, GAP[1]],   // the gap is only a few pixels tall: every row in the band
+        row40: [0, 0.40, 1, 0.40],
+        row60: [0, 0.60, 1, 0.60],
+        mid: [0.44, 0, 0.56, 1],
+        centre: [0.48, 0.10, 0.52, 0.40],
+    };
 
     const view = { on: true, layout: null, pending: null, count: 0, frames: 0 };
     window.DC_VIEW = view;
-    view.detect = () => detect();   // for tests
 
     const canvas = () => window.EJS_emulator && window.EJS_emulator.canvas;
 
@@ -36,14 +44,25 @@
     const dark = (r, g, b) => r + g + b <= 60;
     const menuBlue = (r, g, b) => b >= 120 && b > 2 * r && b > 2 * g;   // the outlines of the in-race menus
 
-    // Read the block of the picture between fractions x0..x1 and y0..y1 (y from the top).
-    // row(k) and col(i) give the share of pixels passing a test, row 0 being the top one.
-    function block(gl, r, x0, y0, x1, y1) {
-        const left = Math.round(r.x + x0 * r.w), bottom = Math.round(r.y + (1 - y1) * r.h);
-        const w = Math.max(1, Math.round(r.x + x1 * r.w) - left);
-        const h = Math.max(1, Math.round(r.y + (1 - y0) * r.h) - bottom);
-        const px = new Uint8Array(w * h * 4);
-        gl.readPixels(left, bottom, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    // Where each region lies in the drawing buffer, and where its pixels go in one byte array.
+    function regionsOf(gl) {
+        const r = pictureRect(gl.drawingBufferWidth, gl.drawingBufferHeight);
+        const out = {};
+        let size = 0;
+        for (const k in REGIONS) {
+            const [x0, y0, x1, y1] = REGIONS[k];
+            const left = Math.round(r.x + x0 * r.w), bottom = Math.round(r.y + (1 - y1) * r.h);
+            const w = Math.max(1, Math.round(r.x + x1 * r.w) - left);
+            const h = Math.max(1, Math.round(r.y + (1 - y0) * r.h) - bottom);
+            out[k] = { left, bottom, w, h, offset: size };
+            size += w * h * 4;
+        }
+        return { regions: out, size };
+    }
+
+    // A region's pixels (rows bottom-up, as read): row(k) and col(i) give the share of pixels
+    // passing a test, row 0 being the top one.
+    function block(px, w, h) {
         const share = (test, o, step, n) => {
             let hit = 0;
             for (let i = 0; i < n; i++, o += step) if (test(px[o], px[o + 1], px[o + 2])) hit++;
@@ -59,20 +78,20 @@
         };
     }
 
-    function detect() {
-        const gl = canvas().getContext("webgl2");
-        const r = pictureRect(gl.drawingBufferWidth, gl.drawingBufferHeight);
-        const read = (x0, y0, x1, y1) => block(gl, r, x0, y0, x1, y1);
-        // The gap is only a few pixels tall: read every pixel row in the band.
-        const band = read(0, GAP[0], 1, GAP[1]);
+    function analyze(data, regions) {
+        const get = (k) => {
+            const b = regions[k];
+            return block(data.subarray(b.offset, b.offset + b.w * b.h * 4), b.w, b.h);
+        };
+        const band = get("band");
         let gap = -1;
         for (let k = 0; k < band.h && gap < 0; k++) if (band.row(k, dark, 0.02, 0.40) >= 0.98) gap = k;
         if (gap < 0) return null;
-        if (read(0, 0.40, 1, 0.40).row(0, dark, 0.02, 0.40) >= 0.98
-            || read(0, 0.60, 1, 0.60).row(0, dark, 0.02, 0.40) >= 0.98) return null;   // a black screen, not a split
+        if (get("row40").row(0, dark, 0.02, 0.40) >= 0.98
+            || get("row60").row(0, dark, 0.02, 0.40) >= 0.98) return null;   // a black screen, not a split
         // The pause menu and its submenus are drawn over the split views as boxes with thin blue
         // outlines across the middle of the picture: show the whole screen then.
-        const mid = read(0.44, 0, 0.56, 1);
+        const mid = get("mid");
         let lines = 0;
         for (let k = 0, run = 0; k <= mid.h; k++) {
             if (k < mid.h && mid.row(k, menuBlue) >= 0.95) run++;
@@ -81,11 +100,52 @@
         if (lines >= 2) return null;
         // Quadrants also have a black column down the middle (the 2-player race intro has a dark
         // right-hand panel, so the gap row alone can't tell).
-        const centre = read(0.48, 0.10, 0.52, 0.40);
+        const centre = get("centre");
         let column = false;
         for (let i = 0; i < centre.w && !column; i++) column = centre.col(i, dark) >= 0.95;
         return column && band.row(gap, dark, 0.80, 0.98) >= 0.98 ? "quads" : "halves";
     }
+
+    // Reading pixels straight back would make the CPU wait for the GPU to finish drawing.
+    // Instead each check copies the regions into a GPU buffer, and the next check (when the
+    // copy is long done) reads them out.
+    let pbo = null, pboSize = 0, fence = null, captured = null;
+
+    function capture(gl) {
+        const c = regionsOf(gl);
+        const prev = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
+        if (!pbo) pbo = gl.createBuffer();
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+        if (c.size > pboSize) { gl.bufferData(gl.PIXEL_PACK_BUFFER, c.size, gl.STREAM_READ); pboSize = c.size; }
+        for (const k in c.regions) {
+            const b = c.regions[k];
+            gl.readPixels(b.left, b.bottom, b.w, b.h, gl.RGBA, gl.UNSIGNED_BYTE, b.offset);
+        }
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, prev);
+        fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+        captured = c;
+    }
+
+    function collect(gl) {
+        const data = new Uint8Array(captured.size);
+        const prev = gl.getParameter(gl.COPY_READ_BUFFER_BINDING);
+        gl.bindBuffer(gl.COPY_READ_BUFFER, pbo);
+        gl.getBufferSubData(gl.COPY_READ_BUFFER, 0, data);
+        gl.bindBuffer(gl.COPY_READ_BUFFER, prev);
+        gl.deleteSync(fence);
+        fence = null;
+        return analyze(data, captured.regions);
+    }
+
+    // For tests: read and analyze the current frame at once.
+    view.detect = function () {
+        const gl = canvas().getContext("webgl2"), c = regionsOf(gl), data = new Uint8Array(c.size);
+        for (const k in c.regions) {
+            const b = c.regions[k];
+            gl.readPixels(b.left, b.bottom, b.w, b.h, gl.RGBA, gl.UNSIGNED_BYTE, data.subarray(b.offset, b.offset + b.w * b.h * 4));
+        }
+        return analyze(data, c.regions);
+    };
 
     function apply() {
         const c = canvas();
@@ -109,8 +169,14 @@
     // Called by netplay.js after every emulated frame while online.
     view.tick = function () {
         if (++view.frames % CHECK_EVERY) return;
-        let layout = null;
-        try { layout = detect(); } catch (e) { return; }
+        let layout;
+        try {
+            const gl = canvas().getContext("webgl2");
+            if (fence && gl.getSyncParameter(fence, gl.SYNC_STATUS) !== gl.SIGNALED) return;
+            layout = fence ? collect(gl) : undefined;   // the frame copied at the previous check
+            capture(gl);
+        } catch (e) { return; }
+        if (layout === undefined) return;
         if (layout === view.pending) view.count++;
         else { view.pending = layout; view.count = 1; }
         if (view.count >= CONFIRM && layout !== view.layout) {

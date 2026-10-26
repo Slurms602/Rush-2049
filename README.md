@@ -30,10 +30,12 @@ browser keeps a private copy, so next time it boots straight away.
    game jumps to the host's current screen, and from then on all copies run in lockstep.
    Friends who join later are brought in the same way.
 
-The input delay is set from everyone's ping, at least 2 frames; the host can change it in the
-Online panel and press **Re-sync everyone**. The panel also shows each friend's ping, whether
-the link is direct or relayed, and their fps. If a copy drifts out of sync, or a player stops
-responding for 5 seconds, the host's game state is re-sent automatically.
+The input delay (at least 2 frames) follows everyone's ping during play; the host can also set
+it with − / + in the Online panel. The panel shows each player's ping, whether the link is
+direct or relayed, their fps and how long their PC takes per frame (it needs to stay under
+16.7 ms). If a copy drifts out of sync, or a player stops responding for 5 seconds, the host's
+game state is re-sent automatically. Everyone needs the same version of the page: if the
+panel says a copy is out of date, reload with Ctrl+F5.
 
 In a split-screen race each player sees only their own view, enlarged to fill the window
 (the "Show all views" button switches back); menus, including the pause menu, show the whole
@@ -71,13 +73,17 @@ python3 serve.py
 - `netplay.js`: lockstep netplay over WebRTC data channels (PeerJS for connection setup,
   with its free public signalling and TURN servers). Each frame runs only after every
   player's input for that frame has arrived; inputs are sent a few frames ahead (the input
-  delay) so the network round trip is hidden. Every 2 seconds each guest sends a hash of
-  its emulated RAM, VRAM and CPU state to the host, which re-sends its save state if they
-  differ. Guest inputs are relayed through the host.
+  delay) so the network round trip is hidden. Guests send inputs to each other directly and
+  through the host; the first copy to arrive is used. Frames run on the system clock, one
+  per display refresh, and the players' clocks are lined up so that everyone has the same
+  headroom for late inputs. Every 2 seconds each guest sends a hash of its emulated RAM,
+  VRAM and CPU state to the host, which re-sends its save state if they differ.
 - `ejs/data/cores/flycast-wasm.data`: a rebuild of the flycast-wasm core that behaves
   identically on fast and slow machines. See [core-build/](core-build/README.md).
 - `ejs/data/src/dc-patches.js`: glue between the page and EmulatorJS, including the
-  main-loop hooks netplay uses to decide when each frame runs.
+  main-loop hooks netplay uses to decide when each frame runs, and the core's audio worklet
+  with rate control (online, sound follows the game clock by playing up to 0.5% faster or
+  slower).
 
 ## Credits and licenses
 

@@ -7,8 +7,8 @@
 <!-- GitHub Pages can't send COOP/COEP headers; this service worker adds them (no-op under serve.py). -->
 <script src="coi-serviceworker.js"></script>
 <script src="vendor/peerjs.min.js"></script>
-<script src="netplay.js"></script>
-<script src="myview.js"></script>
+<script src="netplay.js?v=2"></script>
+<script src="myview.js?v=2"></script>
 <style>
   :root { --bg: #0d0f14; --panel: #161a22; --line: #2a3140; --text: #e6e9ef; --muted: #8a93a6; --accent: #f08a24; }
   * { box-sizing: border-box; }
@@ -365,6 +365,7 @@ function start({ fromSaved = false } = {}) {
   window.EJS_player = "#game";
   window.EJS_core = "flycast";
   window.EJS_pathtodata = "ejs/data/";
+  window.EJS_paths = { "dc-patches.js": "ejs/data/src/dc-patches.js?v=2" };   // bump with netplay.js
   window.EJS_gameUrl = "dreamcast-game";   // placeholder; dc-patches.js supplies the real files
   window.EJS_gameName = main.name.replace(/\.[^.]+$/, "");
   window.EJS_DEBUG_XX = true;              // load unminified sources (no build step needed)

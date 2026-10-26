@@ -150,6 +150,86 @@
         return origInitModule.apply(this, args);
     };
 
+    // The core plays sound through its own AudioWorklet, which it loads from a blob. Swap in
+    // this copy: the same queue and messages, plus optional dynamic rate control. Online, the
+    // game runs on the system clock (so every player's copy keeps the same pace), and the
+    // sound card's clock differs slightly from it; with a target set ({target: samples}), the
+    // worklet plays up to 0.5% faster or slower (inaudible) to keep its queue near the target.
+    // Without a target it plays exactly like the original.
+    const FLY_AUDIO = `
+class FlyAudio extends AudioWorkletProcessor {
+    constructor() {
+        super();
+        this.cap = 32768;
+        this.rbL = new Float32Array(this.cap);
+        this.rbR = new Float32Array(this.cap);
+        this.r = 0; this.w = 0; this.avail = 0; this.frac = 0;
+        this.under = 0; this.drop = 0; this.tick = 0;
+        this.primed = false;
+        this.target = 0; this.level = 0;
+        this.port.onmessage = (e) => {
+            const d = e.data;
+            if (!(d instanceof Int16Array)) {
+                if (d && typeof d.target === "number") { this.target = d.target; this.level = this.avail; }
+                return;
+            }
+            const n = d.length >> 1;
+            if (this.avail + n > this.cap) { this.drop += n; return; }
+            for (let i = 0; i < n; i++) {
+                this.rbL[this.w] = d[2 * i] / 32768;
+                this.rbR[this.w] = d[2 * i + 1] / 32768;
+                this.w = (this.w + 1) % this.cap;
+            }
+            this.avail += n;
+        };
+    }
+    process(inputs, outputs) {
+        const out = outputs[0], L = out[0], R = out[1] || out[0];
+        if (!this.primed) {
+            if (this.avail >= 2048) this.primed = true;
+            else { for (let j = 0; j < L.length; j++) { L[j] = 0; R[j] = 0; } return true; }
+        }
+        let step = 1;
+        if (this.target) {
+            this.level += (this.avail - this.level) * 0.01;
+            step += Math.max(-0.005, Math.min(0.005, (this.level - this.target) / this.target * 0.01));
+        }
+        for (let i = 0; i < L.length; i++) {
+            if (this.avail > 1) {
+                const a = this.r, b = (a + 1) % this.cap, f = this.frac;
+                L[i] = this.rbL[a] + (this.rbL[b] - this.rbL[a]) * f;
+                R[i] = this.rbR[a] + (this.rbR[b] - this.rbR[a]) * f;
+                this.frac += step;
+                const adv = Math.floor(this.frac);
+                this.frac -= adv;
+                this.r = (this.r + adv) % this.cap;
+                this.avail -= adv;
+            } else { L[i] = 0; R[i] = 0; this.under++; this.primed = false; }
+        }
+        if (++this.tick >= 16) {
+            this.tick = 0;
+            this.port.postMessage({ avail: this.avail, under: this.under, drop: this.drop });
+        }
+        return true;
+    }
+}
+registerProcessor("fly-audio", FlyAudio);
+`;
+    if (window.AudioWorklet) {
+        const origAddModule = AudioWorklet.prototype.addModule;
+        AudioWorklet.prototype.addModule = async function(url, options) {
+            if (typeof url === "string" && url.startsWith("blob:")) {
+                try {
+                    if ((await (await fetch(url)).text()).includes("class FlyAudio")) {
+                        url = URL.createObjectURL(new Blob([FLY_AUDIO], { type: "application/javascript" }));
+                        window.DC_AUDIO_RATE = true;
+                    }
+                } catch (e) { console.warn("[dc] audio worklet swap failed", e); }
+            }
+            return origAddModule.call(this, url, options);
+        };
+    }
+
     EmulatorJS.prototype.downloadBios = async function() {
         const dir = SYSTEM_DIR + "/dc";
         this.gameManager.mkdir(SYSTEM_DIR);
