@@ -52,6 +52,7 @@
   .net-row button { width: 32px; padding: 2px; }
   #net-status { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 20; padding: 6px 14px; border-radius: 8px;
     background: rgba(0,0,0,.7); color: #fff; font-size: 14px; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
+  #fps { position: fixed; top: 8px; left: 10px; z-index: 20; font: 12px ui-monospace, monospace; color: #fff; text-shadow: 0 0 3px #000; opacity: .8; pointer-events: none; }
   .join-banner { padding: 12px 14px; border-radius: 10px; background: var(--panel); border: 1px solid var(--accent); margin-bottom: 18px; }
 </style>
 </head>
@@ -102,6 +103,7 @@
   <button id="net-toggle" hidden>Online</button>
   <div id="net-panel" hidden><div id="net-body"></div></div>
   <div id="net-status" hidden></div>
+  <div id="fps"></div>
 </div>
 
 <script>
@@ -164,6 +166,41 @@ function setFiles(kind, list) {
   $("note").textContent = MOBILE && romMB > 700
     ? `This image is ${Math.round(romMB)} MB. Phones can run out of memory on images this big; a .chd version is much smaller.`
     : "";
+  if (kind === "rom") checkGdi(picked.rom).then((msg) => {
+    $("err").textContent = msg;
+    if (msg) $("start").disabled = true;
+  });
+}
+
+// A .gdi only lists the disc's tracks; the track files must be picked along with it.
+async function checkGdi(files) {
+  const gdi = files.find((f) => /\.gdi$/i.test(f.name));
+  if (!(gdi instanceof File)) return "";
+  const text = await gdi.text();
+  const names = [...text.matchAll(/^[ \t]*\d+[ \t]+\d+[ \t]+\d+[ \t]+\d+[ \t]+("[^"]+"|\S+)/gm)].map((m) => m[1].replace(/"/g, ""));
+  const have = new Set(files.map((f) => f.name.toLowerCase()));
+  const missing = names.filter((n) => !have.has(n.toLowerCase()));
+  return missing.length
+    ? "This .gdi also needs " + missing.join(", ") + ". Select every file in its folder together (Ctrl+A), drag the whole folder here, or use a single .chd file."
+    : "";
+}
+
+// Dropping a folder gives one unreadable entry in dataTransfer.files; read its files instead.
+async function droppedFiles(dt) {
+  const entries = [...dt.items].map((i) => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  if (!entries.some((e) => e.isDirectory)) return [...dt.files];
+  const file = (e) => new Promise((resolve, reject) => e.file(resolve, reject));
+  const out = [];
+  for (const e of entries) {
+    if (e.isFile) { out.push(await file(e)); continue; }
+    const reader = e.createReader();
+    for (;;) {
+      const batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+      if (!batch.length) break;
+      for (const c of batch) if (c.isFile) out.push(await file(c));
+    }
+  }
+  return out;
 }
 
 for (const kind of ["rom", "bios"]) {
@@ -171,7 +208,11 @@ for (const kind of ["rom", "bios"]) {
   $(kind).addEventListener("change", (e) => setFiles(kind, e.target.files));
   drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
   drop.addEventListener("dragleave", () => drop.classList.remove("over"));
-  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); setFiles(kind, e.dataTransfer.files); });
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("over");
+    droppedFiles(e.dataTransfer).then((files) => setFiles(kind, files));
+  });
 }
 
 function controls() {

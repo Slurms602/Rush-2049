@@ -6,18 +6,19 @@ player's emulator to produce exactly the same game state from the same inputs, o
 slow machines alike. The stock v1.0 build doesn't: it decides when to compile code and how
 many frames to run per tick from the wall clock. The changes:
 
-- `rec_wasm-lockstep.patch`: compile each code block the first time it runs instead of
-  deferring it to the browser's background compiler on a time budget, and don't build
-  "chains" (they are promoted asynchronously, at a different moment on each machine).
-- `lockstep.py`: adds two exports to `shell/libretro/libretro.cpp`:
-  `fly_set_lockstep(1)` runs exactly one frame per `retro_run` with no wall-clock pacing
-  (the page paces frames), and `fly_state_hash()` hashes RAM, VRAM, sound RAM and the CPU
-  registers for desync checks.
-- `build-prod.sh`: adds those two to `EXPORTED_FUNCTIONS`.
+- `deterministic_jit.py` (on `core/rec-wasm/rec_wasm.cpp`): the JIT keeps its batching and
+  chains but makes every scheduling decision by count instead of elapsed time, and compiles
+  chains synchronously so they go live on the same frame everywhere. Details in the script.
+- `lockstep.py` (on `shell/libretro/libretro.cpp`): `fly_set_lockstep(1)` runs exactly one
+  frame per `retro_run` with no wall-clock pacing (the page paces frames),
+  `fly_state_hash()` hashes RAM, VRAM, sound RAM and the CPU registers for desync checks,
+  and `fly_render_count()` counts emulated frames for the fps readout.
+- `build-prod.sh`: adds those three to `EXPORTED_FUNCTIONS`.
 
 Verified: two instances, one CPU-throttled 3x, loaded the same state and ran 2,400 frames
 of scripted input into a race with identical state hashes at every 60-frame checkpoint.
-The stock core diverged within 60 frames under the same test.
+The stock core diverged within 60 frames under the same test. CPU time per frame (sandbox,
+software rendering, same race): stock 31.2 ms, this build 30.5 ms; worst hitch 177 vs 75 ms.
 
 ## Recipe (Linux, Emscripten SDK 3.1.74)
 
@@ -34,7 +35,7 @@ sed -i 's/\r$//' shell/libretro/audiostream.cpp
 git apply ../flycast-wasm/patches/wasm-jit-phase1-modified.patch
 mkdir -p core/rec-wasm
 cp ../flycast-wasm/patches/{rec_wasm.cpp,wasm_emit.h,wasm_module_builder.h,fly_instrument.h} core/rec-wasm/
-patch -p1 < $R/core-build/rec_wasm-lockstep.patch
+python3 $R/core-build/deterministic_jit.py core/rec-wasm/rec_wasm.cpp
 python3 $R/core-build/lockstep.py shell/libretro/libretro.cpp
 cd .. && bash $R/core-build/build-all.sh     # output in out/
 ```

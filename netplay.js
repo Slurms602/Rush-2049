@@ -105,6 +105,7 @@
     }
 
     function post() {
+        net.fpsFrames = (net.fpsFrames || 0) + 1;
         if (!net.session) return;
         const done = ++net.frame;
         if ((done & 127) === 0) {
@@ -508,6 +509,14 @@
         if (join_) join(join_);
         ui.refresh();
         setInterval(() => { if (net.role === "host" && !net.session) ui.refresh(); }, 2000);
+        // Frames the emulator ran in the last second (what the players actually see).
+        const count = () => (core()._fly_render_count ? core()._fly_render_count() : net.fpsFrames);
+        let last = count();
+        setInterval(() => {
+            const n = count(), el = document.getElementById("fps");
+            if (el) el.textContent = Math.round(n - last) + " fps";
+            last = n;
+        }, 1000);
     };
     net.host = host;
     net.join = join;

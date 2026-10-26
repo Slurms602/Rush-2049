@@ -5,6 +5,8 @@ fly_set_lockstep(1): exactly one emu.render() per retro_run, no wall-clock pacin
   (the page decides when each frame runs).
 fly_state_hash(): xxHash of main RAM, VRAM, sound RAM and the SH4 context, for
   cheap desync checks.
+fly_render_count(): frames emulated so far (for an honest fps readout; retro_run may
+  run zero, one or two frames).
 """
 import sys
 
@@ -18,6 +20,10 @@ anchor = "\t\tif (settings.input.fastForwardMode) {\n\t\t\tfly_frames_to_run = 1
 assert src.count(anchor) == 1, "pacer anchor not found"
 src = src.replace(anchor, "\t\tif (settings.input.fastForwardMode || fly_lockstep) {\n\t\t\tfly_frames_to_run = 1;")
 
+render_anchor = "\t\t\t\t\t\temu.render();\n\t\t\t\t\t\tg_fly_rp[4] += emscripten_get_now() - fly_er_t0;"
+assert src.count(render_anchor) == 1, "render anchor not found"
+src = src.replace(render_anchor, render_anchor + "\n\t\t\t\t\t\tfly_renders++;")
+
 include_anchor = '#include "hw/sh4/sh4_mem.h"\n'
 assert src.count(include_anchor) == 1
 src = src.replace(include_anchor, include_anchor + '''#ifdef __EMSCRIPTEN__
@@ -30,6 +36,8 @@ src = src.replace(include_anchor, include_anchor + '''#ifdef __EMSCRIPTEN__
 // the wall clock, so every machine advances identically per call.
 static bool fly_lockstep = false;
 extern "C" EMSCRIPTEN_KEEPALIVE void fly_set_lockstep(int on) { fly_lockstep = on != 0; }
+static double fly_renders = 0;
+extern "C" EMSCRIPTEN_KEEPALIVE double fly_render_count() { return fly_renders; }
 
 // Desync check: hash of guest-visible memory and CPU state.
 extern "C" EMSCRIPTEN_KEEPALIVE double fly_state_hash()
