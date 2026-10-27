@@ -3,13 +3,17 @@
 // Requires Playwright/Chromium, Python with the builder dependencies, and serve.py
 // configured with the owner's private game and BIOS. Never reads a cached save state.
 // Usage: node tools/tests/custom-track-drive.cjs <site-url> <private-output-dir> [bundle-dir]
-const { chromium } = require('playwright');
+const { chromium, firefox } = require('playwright');
 const { execFileSync } = require('node:child_process');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const [site, output, bundle] = process.argv.slice(2);
 if (!site || !output) throw new Error('Usage: custom-track-drive.cjs <site-url> <private-output-dir>');
+const laps = Number(process.env.RUSH_DRIVE_LAPS || 1);
+if (!Number.isInteger(laps) || laps < 1 || laps > 3) throw new Error('RUSH_DRIVE_LAPS must be 1, 2 or 3');
+const browserName = process.env.RUSH_TEST_BROWSER || 'chromium';
+if (!['chromium', 'firefox'].includes(browserName)) throw new Error('Unsupported test browser');
 const root = path.resolve(__dirname, '../..');
 const trackID = new URL(site).searchParams.get('track') || 'neon-skyway';
 const route = JSON.parse(execFileSync('python3', ['tools/tests/drive_route.py',
@@ -18,9 +22,14 @@ const route = JSON.parse(execFileSync('python3', ['tools/tests/drive_route.py',
 const sections = route.sections;
 fs.mkdirSync(output, { recursive: true });
 (async () => {
-    const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader',
+    const browser = await (browserName === 'firefox' ? firefox : chromium).launch({
+        headless: process.env.RUSH_TEST_HEADED !== '1',
+        ...(browserName === 'firefox' ? { firefoxUserPrefs: {
+            'webgl.force-enabled': true, 'webgl.disabled': false,
+            'gfx.webrender.software': true, 'media.autoplay.default': 0,
+        } } : { args: ['--use-gl=angle', '--use-angle=swiftshader',
         '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required',
-        ...(process.env.RUSH_DEBUG_PORT ? ['--remote-debugging-port=' + Number(process.env.RUSH_DEBUG_PORT)] : [])] });
+        ...(process.env.RUSH_DEBUG_PORT ? ['--remote-debugging-port=' + Number(process.env.RUSH_DEBUG_PORT)] : [])] }) });
     const errors = [];
     try {
         const page = await browser.newPage({ viewport: { width: 960, height: 720 } });
@@ -52,6 +61,9 @@ fs.mkdirSync(output, { recursive: true });
             DC_LOOP.post = () => QA.frame++;
             EJS_emulator.gameManager.Module._fly_set_lockstep(1);
             EJS_emulator.gameManager.setVSync(false);
+        });
+        if (process.env.RUSH_TEST_RESOLUTION_CYCLE === '1') await page.evaluate(() => {
+            EJS_emulator.gameManager.setVariable('reicast_internal_resolution', '640x480');
         });
         async function step(n, input = []) {
             const target = await page.evaluate(({ n, input }) => {
@@ -92,6 +104,22 @@ fs.mkdirSync(output, { recursive: true });
             window.__driveRAM = { base, bytes: M.HEAPU8.length,
                 code: Array.from(M.HEAPU8.slice(base + 0x10000, base + 0x10040)) };
             window.DRIVE = { frame: 0, laps: 0, respawns: 0, last: null, lastIndex: 0, crossings: [], log: [] };
+            // Sample the rendered scene inside postMainLoop, while the WebGL
+            // drawing buffer is still valid. Finite car coordinates alone don't
+            // detect a black picture with a working HUD or continuing audio.
+            const sample = document.createElement('canvas'); sample.width = 64; sample.height = 48;
+            const ctx = sample.getContext('2d', { willReadFrequently: true });
+            DRIVE.pictures = [];
+            DC_LOOP.post = () => {
+                QA.frame++;
+                if (DRIVE.frame % 300) return;
+                const c = EJS_emulator.canvas;
+                ctx.drawImage(c, c.width * .2, c.height * .2, c.width * .6, c.height * .5, 0, 0, 64, 48);
+                const pixels = ctx.getImageData(0, 0, 64, 48).data;
+                let lit = 0;
+                for (let j = 0; j < pixels.length; j += 4) if (pixels[j] + pixels[j + 1] + pixels[j + 2] > 30) lit++;
+                DRIVE.pictures.push({ frame: DRIVE.frame, lit: lit / (64 * 48) });
+            };
             DC_LOOP.pre = () => {
                 if (QA.budget <= 0) return false;
                 try {
@@ -158,22 +186,29 @@ fs.mkdirSync(output, { recursive: true });
             };
         }, { sections, fullThrottle: process.env.RUSH_DRIVE_MODE === 'grip' });
         let result;
-        for (let i = 1; i <= 20; i++) {
+        for (let i = 1; i <= 20 * laps; i++) {
+            if (process.env.RUSH_TEST_RESOLUTION_CYCLE === '1' && (i === 2 || i === 4)) {
+                await page.evaluate((resolution) => EJS_emulator.gameManager.setVariable(
+                    'reicast_internal_resolution', resolution), i === 2 ? '1280x960' : '640x480');
+                await page.setViewportSize(i === 2 ? { width: 1100, height: 800 } : { width: 960, height: 720 });
+            }
             await step(300);
             result = await page.evaluate(() => ({ fingerprint: DC_TRACK.fingerprint,
                 nativeError: window.__driveError || (!EJS_emulator.gameManager.Module._wasm_get_ram_base() ? 'Native core shut down' : null), ...DRIVE }));
             fs.writeFileSync(path.join(output, 'progress.json'), JSON.stringify(result, null, 2));
             await page.screenshot({ path: path.join(output, 'drive-' + i + '.png') });
             console.log('Driving', result.frame, 'laps', result.laps, 'position', result.last);
-            if (result.nativeError || result.invalidPosition || result.fall || result.laps >= 2) break; // First crossing is the starting grid, second is a complete lap.
+            if (result.nativeError || result.invalidPosition || result.fall || result.laps >= laps + 1) break; // First crossing is the starting grid.
         }
         result.route = { shortcuts: route.shortcuts, mainLength: route.mainLength, routeLength: route.routeLength };
         fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify(result, null, 2));
         assert.equal(errors.length, 0, errors.join('\n'));
         assert.ok(!result.nativeError, result.nativeError);
         assert.ok(!result.invalidPosition, `Native car position became nonfinite at driving frame ${result.frame}`);
+        assert.ok(result.pictures.length > 0 && result.pictures.every((p) => p.lit > .05),
+            'The central 3D scene must remain visible throughout the lap');
         assert.ok(!result.fall, `Car fell below the track at driving frame ${result.frame}`);
-        assert.ok(result.laps >= 2, 'Car must complete a forward lap within 6000 driving frames');
+        assert.ok(result.laps >= laps + 1, `Car must complete ${laps} forward lap(s) within ${6000 * laps} driving frames`);
         assert.equal(result.respawns, 0, 'Respawning must not disguise a missed jump');
         for (const id of route.shortcuts) {
             const airborne = result.log.find((r) => r.shortcut === id && r.gap && r.materials.every((m) => m === 8));

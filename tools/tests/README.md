@@ -5,7 +5,7 @@ repository root:
 
 ```sh
 python3 -m unittest discover -s tools/tests -p 'test_*.py'
-node --test tools/tests/custom-tracks.test.js
+node --test tools/tests/*.test.js
 ```
 
 The runtime checks use Playwright with Chromium and a local `serve.py` configured with
@@ -24,6 +24,15 @@ node tools/tests/custom-track-online.cjs 'http://localhost:8080/?track=chemical-
 # Fly the optional shortcuts instead of following every main-road bend.
 RUSH_SHORTCUTS=all node tools/tests/custom-track-drive.cjs 'http://localhost:8080/?track=neon-skyway' /tmp/rush-neon-shortcuts
 RUSH_SHORTCUTS=all node tools/tests/custom-track-drive.cjs 'http://localhost:8080/?track=chemical-circuit' /tmp/rush-chemical-shortcuts
+
+# Exercise resolution changes even when Chromium uses a software GPU. Ordinary
+# software tests stay at low resolution and miss video reinitialization failures.
+RUSH_TEST_HARDWARE_PATH=1 node tools/tests/custom-track-online.cjs 'http://localhost:8080/?track=neon-skyway' /tmp/rush-neon-hardware-online
+RUSH_TEST_RESOLUTION_CYCLE=1 RUSH_SHORTCUTS=all node tools/tests/custom-track-drive.cjs 'http://localhost:8080/?track=chemical-circuit' /tmp/rush-chemical-resize
+
+# Longer solo coverage, and Firefox on a Linux machine with software graphics.
+RUSH_DRIVE_LAPS=3 node tools/tests/custom-track-drive.cjs 'http://localhost:8080/?track=chemical-circuit' /tmp/rush-chemical-full-race
+LIBGL_ALWAYS_SOFTWARE=1 RUSH_TEST_BROWSER=firefox RUSH_TEST_HEADED=1 xvfb-run -a node tools/tests/custom-track-drive.cjs 'http://localhost:8080/?track=neon-skyway' /tmp/rush-firefox
 ```
 
 The driving bot steers from the car's wheel positions in actual Dreamcast RAM. It must
@@ -45,7 +54,8 @@ For private A/B runs, pass a third argument naming a bundle directory containing
 manifest, five files and `track.json`. `RUSH_DRIVE_MODE=grip` retains the original
 full-throttle bot for comparisons on the same layout.
 Review its screenshots to check rendering; position assertions cannot prove that a car
-body is visible.
+body is visible. The driving check also samples the central rendered scene during
+each frame capture to reject a black 3D view even if car coordinates remain finite.
 
 The online check opens two isolated browser contexts and connects them over WebRTC.
 It reaches the main menu before sharing the first state, navigates both controllers
@@ -53,3 +63,5 @@ into a race, checks pause/resume and individual-view cropping, and requires matc
 track fingerprints, no state-hash differences and no automatic resync. It also checks
 that both cars are inside the elevated circuit's bounds. This does not cover four real
 clients or a complete online race with human inputs.
+Page exceptions (including numeric `Infinity`) and video-driver shutdown messages
+fail the online check. Full browser console logs are retained privately for diagnosis.

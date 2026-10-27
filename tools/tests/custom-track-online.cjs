@@ -18,17 +18,36 @@ const raceFrames = Number(frameArg);
 if (!Number.isInteger(raceFrames) || raceFrames < 1200) throw new Error('At least 1200 race frames are required');
 fs.mkdirSync(output, { recursive: true });
 const pages = [], logs = [[], []];
+const errors = [];
+// Exercise the graphics-card path even on a software-only CI machine. The
+// regular software path never changes resolution when a friend joins.
+const hardwarePath = process.env.RUSH_TEST_HARDWARE_PATH === '1';
 let shot = 0;
 let browser;
-const log = (slot, message) => { logs[slot].push(message); console.log('P' + (slot + 1), message); };
+const log = (slot, message) => {
+    logs[slot].push(message);
+    if (/PAGEERROR|CRASH|\[net\]|\[track\]|\[mods\]/.test(message)) console.log('P' + (slot + 1), message);
+};
+function fatal(slot, message) {
+    errors.push('P' + (slot + 1) + ': ' + message);
+    for (const page of pages) page.evaluate(() => { window.__onlineFatal = true; }).catch(() => {});
+}
 async function open(slot, code) {
     const context = await browser.newContext({ viewport: { width: 900, height: 700 } });
     const page = await context.newPage(); pages.push(page);
-    page.on('pageerror', (error) => log(slot, 'PAGEERROR ' + error.message));
-    page.on('console', (message) => {
-        if (/\[net\]|\[track\]|\[mods\]/.test(message.text())) log(slot, message.type() + ' ' + message.text());
+    page.on('pageerror', (error) => {
+        log(slot, 'PAGEERROR ' + error.message);
+        if (!/Wake Lock permission request denied/.test(error.message)) {
+            fatal(slot, error.message);
+        }
     });
-    page.on('crash', () => log(slot, 'CRASH'));
+    page.on('console', (message) => {
+        log(slot, message.type() + ' ' + message.text());
+        if (/Cannot open video driver|SH4 exception when blocked|CONTEXT_LOST_WEBGL/.test(message.text())) {
+            fatal(slot, message.text());
+        }
+    });
+    page.on('crash', () => { log(slot, 'CRASH'); fatal(slot, 'Browser renderer crashed'); });
     const url = new URL(site);
     if (!url.searchParams.has('track')) url.searchParams.set('track', 'neon-skyway');
     url.searchParams.delete('pick');
@@ -37,16 +56,29 @@ async function open(slot, code) {
     await page.waitForFunction(() => window.DC_TRACK?.ready && window.EJS_emulator?.started
         && Number(EJS_emulator.gameManager.getFrameNum()) > 20, null, { timeout: 300000, polling: 1000 });
     await page.evaluate(() => { document.getElementById('gpu-warning').hidden = true; });
+    if (hardwarePath) await page.evaluate(() => {
+        DC_NET.software = false;
+        window.__onlineResolutions = [];
+        const g = EJS_emulator.gameManager, original = g.setVariable;
+        g.setVariable = function(key, value) {
+            if (key === 'reicast_internal_resolution') __onlineResolutions.push(value);
+            return original.call(this, key, value);
+        };
+        g.setVariable('reicast_internal_resolution', '640x480');
+    });
     return page;
 }
 async function frames(count) {
     const target = await pages[0].evaluate((n) => DC_NET.frame + n, count);
-    await pages[0].waitForFunction((f) => DC_NET.frame >= f, target, { timeout: 300000, polling: 200 });
+    await pages[0].waitForFunction((f) => DC_NET.frame >= f || window.__onlineFatal,
+        target, { timeout: 300000, polling: 200 });
+    assert.equal(errors.length, 0, errors.join('\n'));
 }
 async function screenshots(label) {
     for (let i = 0; i < pages.length; i++) await pages[i].screenshot({ path: path.join(output,
         String(shot).padStart(2, '0') + '-' + label + '-p' + (i + 1) + '.png') });
     shot++;
+    assert.equal(errors.length, 0, errors.join('\n'));
     console.log(label, await pages[0].evaluate(() => ({ frame: DC_NET.frame, epoch: DC_NET.epoch, desyncs: DC_NET.desyncs.length })));
 }
 async function press(player, index, held = 12, settled = 120) {
@@ -140,6 +172,8 @@ async function localMenu(host) {
             });
             fs.writeFileSync(path.join(output, 'race-positions.json'), JSON.stringify(cars, null, 2));
             for (const [x, y, z] of cars) {
+                assert.ok([x, y, z].every(Number.isFinite), 'Both cars must have finite coordinates');
+                if (new URL(site).searchParams.get('track') === 'original') continue;
                 assert.ok(x > -1450 && x < 1450 && y > 500 && y < 950 && z > -1200 && z < 900,
                     'Both cars must be on the elevated custom circuit, not in a menu or original track');
             }
@@ -150,12 +184,16 @@ async function localMenu(host) {
             epoch: DC_NET.epoch, frame: DC_NET.frame, desyncs: DC_NET.desyncs.length, session: DC_NET.session,
             slot: DC_NET.mySlot, active: DC_NET.active, status: document.getElementById('net-status').textContent,
             hostHashes: Array.from(DC_NET.myHashes), viewLayout: window.DC_VIEW?.layout,
+            resolutions: window.__onlineResolutions || [],
             peers: Array.from(DC_NET.conns.values()).map((c) => ({ slot: c.slot, accepted: c.accepted, route: c.route, rtt: c.rtt })) }))));
         fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify(results, null, 2));
         for (const r of results) {
             assert.equal(r.session, true); assert.equal(r.epoch, epoch, 'No automatic resync may hide a divergence');
             assert.equal(r.desyncs, 0, 'No state hash may differ'); assert.deepEqual(r.active, [0, 1]);
+            if (hardwarePath) assert.ok(r.resolutions.includes('1280x960'),
+                'The test must actually exercise the resolution change that used to freeze joining');
         }
+        assert.equal(errors.length, 0, errors.join('\n'));
         console.log('PASS: two real clients stayed in sync. Inspect the race screenshots to confirm scene and layout.');
     } finally {
         for (let i = 0; i < logs.length; i++) fs.writeFileSync(path.join(output, 'p' + (i + 1) + '.log'), logs[i].join('\n'));

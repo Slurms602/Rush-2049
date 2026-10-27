@@ -7,11 +7,24 @@
     const ext = (name) => name.split(".").pop().toLowerCase();
     const base = (name) => name.split("/").pop();
 
-    // RetroArch probes a GL parameter WebGL doesn't support during video init. The INVALID_ENUM
-    // it leaves behind is later picked up by RetroArch's error check, which then kills the
-    // video driver ("GL: Invalid enum"). Absorb only that error, and only for getParameter.
-    // Each pname is checked once; unsupported ones return null without touching GL again.
     const gl = WebGL2RenderingContext.prototype;
+    // Flycast toggles the GLES fixed-index primitive restart state around its
+    // triangle strips. WebGL 2 always enables it and rejects these toggles with
+    // INVALID_ENUM. That error can survive until RetroArch next initializes its
+    // framebuffer (including the resolution change when a friend joins), where
+    // it shuts down the video driver and longjmps out as an "Infinity" exception.
+    // The toggles already have no effect in WebGL; avoid generating their error.
+    const FIXED_INDEX_RESTART = 0x8d69;
+    for (const method of ["enable", "disable"]) {
+        const original = gl[method];
+        gl[method] = function(cap) {
+            if (cap === FIXED_INDEX_RESTART) return;
+            return original.call(this, cap);
+        };
+    }
+    // RetroArch also probes unsupported GL parameters during video init. Absorb
+    // only a probe's own INVALID_ENUM; preserve unrelated errors for its caller.
+    // Each pname is checked once; unsupported ones subsequently return null.
     const origGetParameter = gl.getParameter, origGetError = gl.getError;
     const okParams = new Set(), badParams = new Set();
     gl.getParameter = function(pname) {
