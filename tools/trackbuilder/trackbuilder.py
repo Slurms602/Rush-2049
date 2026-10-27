@@ -23,11 +23,14 @@ PVS_PREFIX_COUNT = 117  # Marina's executable culls exactly this many leading sc
 PVS_PADDING_NAME = "TRACK1L99999"
 
 # ---------------------------------------------------------------- centre line
-def catmull(points, samples=40):
+def catmull(points, samples=40, closed=True):
     """Closed centripetal Catmull-Rom through the control points, densely sampled."""
     P = np.array(points, float); n = len(P); out = []
-    for i in range(n):
+    for i in range(n if closed else n - 1):
         p0, p1, p2, p3 = P[(i - 1) % n], P[i], P[(i + 1) % n], P[(i + 2) % n]
+        if not closed:
+            if i == 0: p0 = 2 * p1 - p2
+            if i == n - 2: p3 = 2 * p2 - p1
         t0 = 0.0
         t1 = t0 + np.linalg.norm(p1 - p0) ** 0.5
         t2 = t1 + np.linalg.norm(p2 - p1) ** 0.5
@@ -39,30 +42,34 @@ def catmull(points, samples=40):
             b1 = (t2 - t) / (t2 - t0) * a1 + (t - t0) / (t2 - t0) * a2
             b2 = (t3 - t) / (t3 - t1) * a2 + (t - t1) / (t3 - t1) * a3
             out.append(((t2 - t) / (t2 - t1) * b1 + (t - t1) / (t2 - t1) * b2, i, (t - t1) / (t2 - t1)))
+    if not closed: out.append((P[-1], n - 2, 1.0))
     return out
 
-def resample(desc):
+def resample(desc, closed=True):
     pts = desc["points"]
-    dense = catmull([[p["x"], p["y"], p["z"]] for p in pts])
+    dense = catmull([[p["x"], p["y"], p["z"]] for p in pts], closed=closed)
     P = np.array([d[0] for d in dense]); seg = [d[1] for d in dense]; frac = [d[2] for d in dense]
-    L = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(np.vstack([P, P[:1]]), axis=0), axis=1))])
+    line = np.vstack([P, P[:1]]) if closed else P
+    L = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(line, axis=0), axis=1))])
     total = L[-1]; n = int(round(total / STEP)); out = []
-    for k in range(n):
+    for k in range(n if closed else n + 1):
         s = k * total / n
-        j = min(np.searchsorted(L, s, side="right") - 1, len(P) - 1)
+        j = min(np.searchsorted(L, s, side="right") - 1, len(P) - (1 if closed else 2))
         u = (s - L[j]) / max(L[j + 1] - L[j], 1e-9)
         pos = P[j] * (1 - u) + P[(j + 1) % len(P)] * u
         a, b = pts[seg[j]], pts[(seg[j] + 1) % len(pts)]
         f = frac[j]
         lerp = lambda key, dflt: a.get(key, dflt) * (1 - f) + b.get(key, dflt) * f
-        out.append(dict(pos=pos, s=s, width=lerp("width", 60.0), bank=lerp("bank", 0.0),
+        out.append(dict(pos=pos, s=s, progress=seg[j] + frac[j], width=lerp("width", 60.0), bank=lerp("bank", 0.0),
                         gap=bool(a.get("gap", False)), rails=bool(a.get("rails", True))))
     return out, total
 
-def frames(sec):
+def frames(sec, closed=True):
     n = len(sec)
     for k, c in enumerate(sec):
-        T = sec[(k + 1) % n]["pos"] - sec[(k - 1) % n]["pos"]; T /= np.linalg.norm(T)
+        before = (k - 1) % n if closed else max(0, k - 1)
+        after = (k + 1) % n if closed else min(n - 1, k + 1)
+        T = sec[after]["pos"] - sec[before]["pos"]; T /= np.linalg.norm(T)
         S = np.cross(T, [0.0, 1.0, 0.0]); S /= np.linalg.norm(S)
         N = np.cross(S, T)
         b = math.radians(c["bank"])
@@ -197,6 +204,34 @@ class Mesh:
         self.words += struct.pack("<I", 0xE0000000)
         return bytes(self.words)
 
+def ribbon_mesh(m, sec, run, tex_ids, total):
+    dist = lambda k: sec[k]["s"] if k or run[0] == 0 else total
+    vv = lambda k: dist(k) / 60.0
+    m.texture(tex_ids["ROAD"])
+    m.strip([v for k in run for v in ((sec[k]["L"], (0.0, vv(k))), (sec[k]["R"], (1.0, vv(k))))])
+    m.texture(tex_ids["UNDER"])
+    m.strip([v for k in run for v in ((sec[k]["R"] - sec[k]["N"] * DEPTH, (1.0, vv(k))),
+                                        (sec[k]["L"] - sec[k]["N"] * DEPTH, (0.0, vv(k))))])
+    for side, sgn in (("L", -1), ("R", 1)):
+        # A shortcut opens one side of a few sections. Split only that rail into
+        # solid runs; a single opening must not hide the whole chunk's railing.
+        runs = []; current = []
+        for a, b in zip(run, run[1:]):
+            if not sec[a].get("rails_" + side, sec[a]["rails"]):
+                if current: runs.append(current); current = []
+                continue
+            if not current: current = [a]
+            current.append(b)
+        if current: runs.append(current)
+        for rail in runs:
+            m.texture(tex_ids["RAIL"])
+            top = lambda k: sec[k][side] + sec[k]["N"] * RAIL_H
+            if sgn < 0:
+                m.strip([v for k in rail for v in ((top(k), (vv(k), 0.0)), (sec[k][side], (vv(k), 1.0)))])
+            else:
+                m.strip([v for k in rail for v in ((sec[k][side], (vv(k), 1.0)), (top(k), (vv(k), 0.0)))])
+
+
 def build_meshes(sec, tex_ids, total):
     n = len(sec); objects = []
     for start in range(0, n, CHUNK):
@@ -212,21 +247,7 @@ def build_meshes(sec, tex_ids, total):
             cur.append(b)
         if cur: runs.append(cur)
         for run in runs:
-            dist = lambda k: sec[k]["s"] if k or run[0] == 0 else total
-            vv = lambda k: dist(k) / 60.0
-            m.texture(tex_ids["ROAD"])
-            m.strip([v for k in run for v in ((sec[k]["L"], (0.0, vv(k))), (sec[k]["R"], (1.0, vv(k))))])
-            m.texture(tex_ids["UNDER"])
-            m.strip([v for k in run for v in ((sec[k]["R"] - sec[k]["N"] * DEPTH, (1.0, vv(k))),
-                                                (sec[k]["L"] - sec[k]["N"] * DEPTH, (0.0, vv(k))))])
-            for side, sgn in (("L", -1), ("R", 1)):
-                if not all(sec[k]["rails"] for k in run[:-1]): continue
-                m.texture(tex_ids["RAIL"])
-                top = lambda k: sec[k][side] + sec[k]["N"] * RAIL_H
-                if sgn < 0:
-                    m.strip([v for k in run for v in ((top(k), (vv(k), 0.0)), (sec[k][side], (vv(k), 1.0)))])
-                else:
-                    m.strip([v for k in run for v in ((sec[k][side], (vv(k), 1.0)), (top(k), (vv(k), 0.0)))])
+            ribbon_mesh(m, sec, run, tex_ids, total)
         if m.pts: objects.append(m)
     return objects
 
@@ -383,6 +404,19 @@ def road_file(polys):
     assert len(polys) < 8192 and nv < 65536
     # Quadtree over x/z: leaves list the surfaces overlapping them.
     B = np.array(boxes)
+    # X/Z bounding boxes greatly overestimate diagonal ribbons at crossovers.
+    # Native contact queries unpack each leaf into a small stack array; a dense
+    # leaf can overwrite saved registers even though the whole file fits RAM.
+    # Use the separating-axis test against the actual convex polygons as well.
+    footprints = []
+    for pts, _, _ in polys:
+        p = np.asarray(pts)[:, [0, 2]]
+        footprints.append(np.vstack([p, np.repeat(p[-1:], 4 - len(p), axis=0)]))
+    P = np.array(footprints)
+    E = np.roll(P, -1, axis=1) - P
+    axes = np.stack([-E[:, :, 1], E[:, :, 0]], axis=2)
+    projections = np.einsum('nki,nji->nkj', P, axes)
+    proj_lo, proj_hi = projections.min(axis=1), projections.max(axis=1)
     root = [int(math.floor(B[:, 0].min())) - 8, int(math.ceil(B[:, 1].max())) + 8,
             int(math.floor(B[:, 2].min())) - 8, int(math.ceil(B[:, 3].max())) + 8]
     nodes = []; leaves = bytearray(b"\0")              # offset 0 means "empty"
@@ -403,12 +437,21 @@ def road_file(polys):
         quads = [(box[0], mx, mz, box[3]), (mx, box[1], mz, box[3]), (box[0], mx, box[2], mz), (mx, box[1], box[2], mz)]
         children = [0] * 4; fl_nodes = 0; fl_hi = 0
         for q, (x0, x1, z0, z1) in enumerate(quads):
-            sub = [i for i in ids if B[i, 1] >= x0 - 1 and B[i, 0] <= x1 + 1 and B[i, 3] >= z0 - 1 and B[i, 2] <= z1 + 1]
+            candidates = np.array([i for i in ids if B[i, 1] >= x0 - 1 and B[i, 0] <= x1 + 1
+                                   and B[i, 3] >= z0 - 1 and B[i, 2] <= z1 + 1], dtype=int)
+            center = np.array([(x0 + x1) / 2, (z0 + z1) / 2])
+            half = np.array([(x1 - x0) / 2 + 1, (z1 - z0) / 2 + 1])
+            projected = axes[candidates] @ center
+            radius = abs(axes[candidates]) @ half
+            overlap = np.all((projected + radius >= proj_lo[candidates] - 1e-6)
+                             & (projected - radius <= proj_hi[candidates] + 1e-6), axis=1)
+            sub = candidates[overlap].tolist()
             if not sub: continue
-            if len(sub) > 20 and depth < 12 and (x1 - x0) > 24 and (z1 - z0) > 24:
+            if len(sub) > 20 and depth < 16 and (x1 - x0) > 1 and (z1 - z0) > 1:
                 children[q] = build((x0, x1, z0, z1), sub, me, depth + 1); fl_nodes |= 1 << q
             else:
-                assert len(sub) <= 255
+                if len(sub) > 32:
+                    raise ValueError("Collision leaves must contain at most 32 surfaces for native query buffers.")
                 off = len(leaves); leaves.extend(leaf_list(sub))
                 children[q] = off & 0xffff
                 if off >> 16: fl_hi |= 1 << (4 + q)
@@ -419,19 +462,25 @@ def road_file(polys):
     counts = (0, len(nodes), len(polys), nv, 0, len(vlist), len(leaves) & 0xffff, len(leaves) >> 16)
     return struct.pack("<8H", *counts) + tree + surfs + verts + bytes(vlist) + bytes(leaves)
 
-def collision(sec, low, span, c):
+def ribbon_collision(sec, closed=True):
     polys = []; n = len(sec)
-    for k in range(n):
+    for k in range(n if closed else n - 1):
         a, b = sec[k], sec[(k + 1) % n]
         if a["gap"]: continue
         up = (a["N"] + b["N"]) / 2
         polys.append(((a["L"], a["R"], b["R"]), up, 0x0000))
         polys.append(((a["L"], b["R"], b["L"]), up, 0x0000))
-        if a["rails"]:
-            for side, inward in (("L", (a["S"] + b["S"]) / 2), ("R", -(a["S"] + b["S"]) / 2)):
+        for side, inward in (("L", (a["S"] + b["S"]) / 2), ("R", -(a["S"] + b["S"]) / 2)):
+            if a.get("rails_" + side, a["rails"]):
                 p0, p1 = a[side], b[side]; p2, p3 = p1 + b["N"] * RAIL_H, p0 + a["N"] * RAIL_H
                 polys.append(((p0, p1, p2), inward, 0x0005))
                 polys.append(((p0, p2, p3), inward, 0x0005))
+    return polys
+
+
+def collision(sec, low, span, c, branches=()):
+    polys = ribbon_collision(sec)
+    for branch in branches: polys += ribbon_collision(branch, closed=False)
     # Crash surface far below, in tiles (local coordinates must fit 16 bits). Surface 2
     # is merely low-friction water and lets a fallen car keep driving under the track;
     # surface 7 is the game's crash material.
@@ -445,14 +494,17 @@ def collision(sec, low, span, c):
     return polys
 
 # ---------------------------------------------------------------- TRACKnPATH.LZS
-def path_file(sec, total, reverse=False, ncp=6):
+def path_file(sec, total, reverse=False, ncp=6, checkpoints=None):
     n = len(sec); order = list(range(n))
     if reverse: order = [0] + order[1:][::-1]
     pick = lambda k: sec[order[k % n]]
     fwd = lambda c: -c["T"] if reverse else c["T"]
+    if checkpoints is not None: ncp = len(checkpoints)
     cp = bytearray(812); struct.pack_into(">H", cp, 8, ncp)
-    for i in range(ncp):
-        c = pick(int(i * n / ncp))
+    indices = checkpoints if checkpoints is not None else [int(i * n / ncp) for i in range(ncp)]
+    if checkpoints is not None and reverse: indices = indices[:1] + indices[1:][::-1]
+    for i, idx in enumerate(indices):
+        c = sec[idx] if checkpoints is not None else pick(idx)
         r = c["width"] * 0.75 + 20
         struct.pack_into(">3f3fiH", cp, 0x0c + i * 80, *c["pos"], *fwd(c), int(r * r), 7 if i == 0 else 0)
     # Centre line every 2 sections (20 ft), and four racing lines across the road.
@@ -475,13 +527,18 @@ def build(desc, outdir):
     if slot != 1:
         raise ValueError("This builder currently supports Marina (slot 1) only.")
     sec, total = resample(desc); frames(sec)
+    import shortcuts
+    branches = shortcuts.prepare(desc, sec)
+    checkpoints = shortcuts.checkpoint_indices(desc, sec)
     textures = make_textures()
     chemical = desc.get("theme") == "chemical"
     if chemical:
         import chemical_theme
         textures = chemical_theme.textures(textures, vq_encode)
+    if branches: textures = sorted(textures + [shortcuts.texture(vq_encode)], key=lambda t: t[0])
     tex_ids = {t[0]: i for i, t in enumerate(textures)}
     meshes = build_meshes(sec, tex_ids, total)
+    shortcuts.add_meshes(branches, meshes, sec, tex_ids)
     sky, low, span, c = sky_and_void(sec, tex_ids)
     if chemical:
         low = min(s["pos"][1] for s in sec) - 160
@@ -497,9 +554,10 @@ def build(desc, outdir):
         f"TRACK{slot}.LZS": track_file(slot, objects, textures),
         # SKYSKY is drawn by the engine itself: it is in the track file but never placed.
         f"TRACK{slot}WORLDS.LZS": worlds_file(slot, placements, coin_spots(sec)),
-        f"TRACK{slot}ROAD.LZS": road_file(collision(sec, low, span, c)),
-        f"TRACK{slot}PATH.LZS": path_file(sec, total),
-        f"TRACK{slot}PATHBACK.LZS": path_file(sec, total, reverse=True),
+        f"TRACK{slot}ROAD.LZS": road_file(collision(sec, low, span, c,
+            [deck for b in branches for deck in (b["sections"], b["landing"]) if deck])),
+        f"TRACK{slot}PATH.LZS": path_file(sec, total, checkpoints=checkpoints),
+        f"TRACK{slot}PATHBACK.LZS": path_file(sec, total, reverse=True, checkpoints=checkpoints),
     }
     for name, data in files.items():
         enc = encode(data)

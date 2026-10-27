@@ -12,35 +12,32 @@ const [site, output, bundle] = process.argv.slice(2);
 if (!site || !output) throw new Error('Usage: custom-track-drive.cjs <site-url> <private-output-dir>');
 const root = path.resolve(__dirname, '../..');
 const trackID = new URL(site).searchParams.get('track') || 'neon-skyway';
-const sections = JSON.parse(execFileSync('python3', ['-c', `
-import json,sys,math,numpy as np
-sys.path.insert(0,'tools/trackbuilder')
-from trackbuilder import resample,frames
-s,_=resample(json.load(open(sys.argv[1])));frames(s)
-out=[];jump=0
-for k,q in enumerate(s):
- if q['gap'] and not s[(k-1)%len(s)]['gap']: jump+=1
- a=(q['pos']-s[(k-3)%len(s)]['pos'])[[0,2]]
- b=(s[(k+3)%len(s)]['pos']-q['pos'])[[0,2]]
- curvature=abs(math.atan2(a[0]*b[1]-a[1]*b[0],a@b))/max(1,(np.linalg.norm(a)+np.linalg.norm(b))/2)
- out.append(dict(pos=q['pos'].tolist(),gap=q['gap'],jump=jump if q['gap'] else 0,width=q['width'],
-                 limit=min(300,max(70,math.sqrt(65/max(curvature,1e-6))))))
-print(json.dumps(out))
-`, bundle ? path.join(path.resolve(bundle), 'track.json') : `tracks/${trackID}/track.json`], { cwd: root, encoding: 'utf8' }));
+const route = JSON.parse(execFileSync('python3', ['tools/tests/drive_route.py',
+    bundle ? path.join(path.resolve(bundle), 'track.json') : `tracks/${trackID}/track.json`,
+    process.env.RUSH_SHORTCUTS || 'none'], { cwd: root, encoding: 'utf8' }));
+const sections = route.sections;
 fs.mkdirSync(output, { recursive: true });
 (async () => {
     const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader',
-        '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+        '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required',
+        ...(process.env.RUSH_DEBUG_PORT ? ['--remote-debugging-port=' + Number(process.env.RUSH_DEBUG_PORT)] : [])] });
     const errors = [];
     try {
         const page = await browser.newPage({ viewport: { width: 960, height: 720 } });
+        page.on('console', (message) => fs.appendFileSync(path.join(output, 'browser.log'), message.text() + '\n'));
+        await page.addInitScript(() => {
+            window.__driveError = null;
+            addEventListener('error', (e) => { if (e.message) window.__driveError = e.message; });
+        });
         if (bundle) await page.route(`**/tracks/${trackID}/*`, (route) => {
             const name = path.basename(new URL(route.request().url()).pathname);
             return route.fulfill({ path: path.join(path.resolve(bundle), name) });
         });
         page.on('pageerror', (e) => {
             // Headless Chromium denies the emulator's optional screen wake lock.
-            if (!/Wake Lock permission request denied/.test(e.message)) errors.push(e.message);
+            if (!/Wake Lock permission request denied/.test(e.message)) {
+                errors.push(e.message); console.error('Emulator page error:', e.message);
+            }
         });
         const url = new URL(site);
         url.searchParams.set('track', trackID);
@@ -61,8 +58,26 @@ fs.mkdirSync(output, { recursive: true });
                 for (const [i, v] of input) EJS_emulator.gameManager.functions.simulateInput(0, i, v);
                 QA.budget = n; return QA.frame + n;
             }, { n, input });
-            await page.waitForFunction((f) => QA.frame >= f || window.DRIVE?.invalidPosition,
-                target, { timeout: 300000, polling: 200 });
+            try {
+                await page.waitForFunction((f) => QA.frame >= f || window.DRIVE?.invalidPosition || window.DRIVE?.fall || window.__driveError
+                    || !EJS_emulator.gameManager.Module._wasm_get_ram_base(),
+                    target, { timeout: 120000, polling: 200 });
+            } catch (error) {
+                const diagnostic = await Promise.race([page.evaluate(() => {
+                    const M = EJS_emulator.gameManager.Module;
+                    const base = M._wasm_get_ram_base(), i = base / 4 + 0x14cde0 / 4;
+                    const ctx = M._fly_ctx_ptr?.();
+                    M._fly_dump_pc_trace?.();
+                    return { qa: QA, error: window.__driveError, drive: window.DRIVE,
+                        coreLog: window._flyLog?.slice(-150),
+                        ram: { base, bytes: M.HEAPU8.length, start: window.__driveRAM,
+                            code: Array.from(M.HEAPU8.slice(base + 0x10000, base + 0x10040)),
+                            ctx: ctx ? Array.from(M.HEAPU32.slice(ctx / 4, ctx / 4 + 128)) : null },
+                        car: Array.from(M.HEAPF32.slice(i, i + 18)) };
+                }), new Promise((resolve) => setTimeout(() => resolve({ error: 'Renderer unresponsive' }), 10000))]);
+                fs.writeFileSync(path.join(output, 'timeout.json'), JSON.stringify(diagnostic, null, 2));
+                throw error;
+            }
         }
         await step(1800);
         await step(300, [[3, 1]]); await step(1, [[3, 0]]);
@@ -73,13 +88,20 @@ fs.mkdirSync(output, { recursive: true });
         await page.screenshot({ path: path.join(output, 'grid.png') });
         await page.evaluate(({ sections, fullThrottle }) => {
             const gm = EJS_emulator.gameManager, M = gm.Module;
-            window.DRIVE = { frame: 0, laps: 0, respawns: 0, last: null, lastIndex: 0, log: [] };
+            const base = M._wasm_get_ram_base();
+            window.__driveRAM = { base, bytes: M.HEAPU8.length,
+                code: Array.from(M.HEAPU8.slice(base + 0x10000, base + 0x10040)) };
+            window.DRIVE = { frame: 0, laps: 0, respawns: 0, last: null, lastIndex: 0, crossings: [], log: [] };
             DC_LOOP.pre = () => {
                 if (QA.budget <= 0) return false;
+                try {
                 const f = M.HEAPF32, i = M._wasm_get_ram_base() / 4 + 0x14cde0 / 4;
                 const p = [f[i], f[i + 1], f[i + 2]];
                 if (!p.every(Number.isFinite)) {
                     DRIVE.invalidPosition = p; QA.budget = 0; return false;
+                }
+                if (p[1] < 500) {
+                    DRIVE.fall = p; QA.budget = 0; return false;
                 }
                 let distance = Infinity, idx = 0;
                 for (let k = 0; k < sections.length; k++) {
@@ -87,7 +109,7 @@ fs.mkdirSync(output, { recursive: true });
                     if (d < distance) { distance = d; idx = k; }
                 }
                 const speed = DRIVE.last ? Math.hypot(p[0] - DRIVE.last[0], p[2] - DRIVE.last[2]) * 60 : 0;
-                if (speed > 6000) DRIVE.respawns++;
+                if (DRIVE.last && Math.hypot(...p.map((v, k) => v - DRIVE.last[k])) * 60 > 6000) DRIVE.respawns++;
                 const ahead = fullThrottle ? Math.round(Math.max(10, Math.min(28, 10 + speed * 0.055)))
                     : Math.round(Math.max(7, Math.min(19, 4 + speed * 0.045)));
                 const q = sections[(idx + ahead) % sections.length].pos;
@@ -118,30 +140,51 @@ fs.mkdirSync(output, { recursive: true });
                 gm.functions.simulateInput(0, 13, braking ? 0 : 32767);
                 gm.functions.simulateInput(0, 12, braking ? 32767 : 0);
                 gm.functions.simulateInput(0, 8, sections[idx].gap ? 1 : 0); // B: wings
-                if (idx < 40 && DRIVE.lastIndex > sections.length - 40) DRIVE.laps++;
+                if (idx < 40 && DRIVE.lastIndex > sections.length - 40) {
+                    DRIVE.laps++; DRIVE.crossings.push(DRIVE.frame);
+                }
                 DRIVE.lastIndex = idx; DRIVE.last = p;
                 if (DRIVE.frame % 10 === 0) {
                     DRIVE.log.push({ frame: DRIVE.frame, p, idx, speed,
-                        slip, steer, targetSpeed, braking, error: Math.sqrt(distance), gap: sections[idx].gap, jump: sections[idx].jump, laps: DRIVE.laps,
+                        slip, steer, targetSpeed, braking, error: Math.sqrt(distance), gap: sections[idx].gap, jump: sections[idx].jump, shortcut: sections[idx].shortcut, mainIndex: sections[idx].mainIndex, laps: DRIVE.laps,
                         materials,
                         suspension: Array.from(f.slice((model + 0x5cc) / 4, (model + 0x5dc) / 4)) });
                 }
                 DRIVE.frame++; QA.budget--; return true;
+                } catch (error) {
+                    window.__driveError = error.stack || error.message;
+                    QA.budget = 0; return false;
+                }
             };
         }, { sections, fullThrottle: process.env.RUSH_DRIVE_MODE === 'grip' });
         let result;
         for (let i = 1; i <= 20; i++) {
             await step(300);
-            result = await page.evaluate(() => ({ fingerprint: DC_TRACK.fingerprint, ...DRIVE }));
+            result = await page.evaluate(() => ({ fingerprint: DC_TRACK.fingerprint,
+                nativeError: window.__driveError || (!EJS_emulator.gameManager.Module._wasm_get_ram_base() ? 'Native core shut down' : null), ...DRIVE }));
+            fs.writeFileSync(path.join(output, 'progress.json'), JSON.stringify(result, null, 2));
             await page.screenshot({ path: path.join(output, 'drive-' + i + '.png') });
             console.log('Driving', result.frame, 'laps', result.laps, 'position', result.last);
-            if (result.invalidPosition || result.laps >= 2) break; // First crossing is the starting grid, second is a complete lap.
+            if (result.nativeError || result.invalidPosition || result.fall || result.laps >= 2) break; // First crossing is the starting grid, second is a complete lap.
         }
+        result.route = { shortcuts: route.shortcuts, mainLength: route.mainLength, routeLength: route.routeLength };
         fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify(result, null, 2));
         assert.equal(errors.length, 0, errors.join('\n'));
+        assert.ok(!result.nativeError, result.nativeError);
         assert.ok(!result.invalidPosition, `Native car position became nonfinite at driving frame ${result.frame}`);
+        assert.ok(!result.fall, `Car fell below the track at driving frame ${result.frame}`);
         assert.ok(result.laps >= 2, 'Car must complete a forward lap within 6000 driving frames');
         assert.equal(result.respawns, 0, 'Respawning must not disguise a missed jump');
+        for (const id of route.shortcuts) {
+            const airborne = result.log.find((r) => r.shortcut === id && r.gap && r.materials.every((m) => m === 8));
+            assert.ok(airborne, `Shortcut ${id} must include real flight`);
+            const landing = result.log.find((r) => r.frame > airborne.frame && r.materials.filter((m) => m === 0).length >= 2);
+            const deck = route.landings.find((q) => q.id === id).deck;
+            assert.ok(landing && deck.some(({ pos, width }) => Math.abs(landing.p[1] - pos[1]) < 25
+                && Math.hypot(landing.p[0] - pos[0], landing.p[2] - pos[2]) < width / 2 + 15),
+                `Shortcut ${id} must land on its intended rejoin, including the correct level`);
+        }
+        if (route.shortcuts.length) assert.ok(route.routeLength < route.mainLength, 'A shortcut must shorten the lap');
         for (const jump of new Set(sections.filter((s) => s.gap).map((s) => s.jump))) {
             assert.ok(result.log.some((r) => r.jump === jump), `The lap must include jump ${jump}`);
         }

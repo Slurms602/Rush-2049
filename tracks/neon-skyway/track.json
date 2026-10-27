@@ -1,7 +1,7 @@
 {
   "name": "Neon Skyway",
   "slot": 1,
-  "description": "A floating technical circuit with alternating esses, two braking corners and a straight wing jump with a wide landing.",
+  "description": "A floating technical circuit with alternating esses, braking corners and a wing jump. An optional green launch lane flies across the infield to skip the far loop.",
   "points": [
     {
       "x": -540,
@@ -177,19 +177,121 @@
       "x": -837,
       "y": 616,
       "z": 0,
-      "width": 100
+      "width": 120
     },
     {
       "x": -900,
       "y": 607,
       "z": -198,
-      "width": 100
+      "width": 120
     },
     {
       "x": -810,
       "y": 600,
       "z": -468,
-      "width": 100
+      "width": 110
+    }
+  ],
+  "checkpoints": [
+    0,
+    4.1,
+    10.3,
+    12.4,
+    22.4,
+    30
+  ],
+  "shortcuts": [
+    {
+      "id": "infield-sky-cut",
+      "name": "Infield Sky Cut",
+      "entry": 13.0,
+      "rejoin": 21.75,
+      "openings": [
+        {
+          "from": 12.5,
+          "to": 13.7,
+          "side": "R"
+        },
+        {
+          "from": 20.7,
+          "to": 22.1,
+          "side": "R"
+        }
+      ],
+      "ramp": [
+        {
+          "x": 471.754,
+          "y": 639.25,
+          "z": 315.338,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": 554.113,
+          "y": 640.778,
+          "z": 351.597,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": 550.0,
+          "y": 645.0,
+          "z": 465.0,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": 440.0,
+          "y": 650.0,
+          "z": 540.0,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": 310.0,
+          "y": 666.0,
+          "z": 600.0,
+          "width": 90,
+          "rails": false
+        },
+        {
+          "x": 200.0,
+          "y": 700,
+          "z": 640.0,
+          "width": 70,
+          "rails": false
+        }
+      ],
+      "landing": [
+        {
+          "x": -40.0,
+          "y": 650.0,
+          "z": 730.0,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": -220.0,
+          "y": 655.0,
+          "z": 800.0,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": -449.681,
+          "y": 658.418,
+          "z": 870.125,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": -563.93,
+          "y": 656.418,
+          "z": 833.583,
+          "width": 120,
+          "rails": false
+        }
+      ]
     }
   ]
 }

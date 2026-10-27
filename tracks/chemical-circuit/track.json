@@ -2,7 +2,7 @@
   "name": "Chemical Circuit",
   "slot": 1,
   "theme": "chemical",
-  "description": "A chemical works circuit with linked esses, two wing jumps and elevated crossovers through blue steel, orange pipes and glowing purple pools.",
+  "description": "A chemical works circuit with linked esses, two wing jumps and elevated crossovers through blue steel, orange pipes and glowing purple pools. An optional green launch lane flies past the upper return esses.",
   "points": [
     {
       "x": -240,
@@ -186,13 +186,13 @@
       "x": -64,
       "y": 666,
       "z": -144,
-      "width": 94
+      "width": 180
     },
     {
       "x": -256,
       "y": 652,
       "z": -296,
-      "width": 94
+      "width": 160
     },
     {
       "x": -480,
@@ -217,6 +217,92 @@
       "y": 600,
       "z": -760,
       "width": 94
+    }
+  ],
+  "checkpoints": [
+    0,
+    7.2,
+    13.1,
+    18.0,
+    24.3,
+    30.6
+  ],
+  "shortcuts": [
+    {
+      "id": "reactor-flyover",
+      "name": "Reactor Flyover",
+      "entry": 25.75,
+      "rejoin": 29.5,
+      "openings": [
+        {
+          "from": 25.3,
+          "to": 26.8,
+          "side": "R"
+        },
+        {
+          "from": 28.8,
+          "to": 30.2,
+          "side": "R"
+        },
+        {
+          "from": 29.1,
+          "to": 30.2,
+          "side": "L"
+        }
+      ],
+      "ramp": [
+        {
+          "x": 775,
+          "y": 680,
+          "z": -158,
+          "width": 100,
+          "rails": false
+        },
+        {
+          "x": 635,
+          "y": 682,
+          "z": -185,
+          "width": 90,
+          "rails": false
+        },
+        {
+          "x": 505,
+          "y": 700,
+          "z": -190,
+          "width": 70,
+          "rails": false
+        },
+        {
+          "x": 380,
+          "y": 722,
+          "z": -195,
+          "width": 70,
+          "rails": false
+        }
+      ],
+      "landing": [
+        {
+          "x": 180,
+          "y": 675,
+          "z": -205,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": 0,
+          "y": 667,
+          "z": -220,
+          "width": 100,
+          "rails": false
+        },
+        {
+          "x": -81.881,
+          "y": 662.526,
+          "z": -226.425,
+          "width": 80,
+          "rails": false
+        }
+      ]
     }
   ]
 }

@@ -20,6 +20,10 @@ node tools/tests/custom-track-online.cjs http://localhost:8080/ /tmp/rush-online
 # The URL chooses another circuit; both scripts default to Neon Skyway.
 node tools/tests/custom-track-drive.cjs 'http://localhost:8080/?track=chemical-circuit' /tmp/rush-chemical-driving
 node tools/tests/custom-track-online.cjs 'http://localhost:8080/?track=chemical-circuit' /tmp/rush-chemical-online
+
+# Fly the optional shortcuts instead of following every main-road bend.
+RUSH_SHORTCUTS=all node tools/tests/custom-track-drive.cjs 'http://localhost:8080/?track=neon-skyway' /tmp/rush-neon-shortcuts
+RUSH_SHORTCUTS=all node tools/tests/custom-track-drive.cjs 'http://localhost:8080/?track=chemical-circuit' /tmp/rush-chemical-shortcuts
 ```
 
 The driving bot steers from the car's wheel positions in actual Dreamcast RAM. It must
@@ -27,6 +31,12 @@ complete a forward lap, cross the gap and remain at road altitude without respaw
 Every separate gap must be crossed. Its nearest-road lookup includes elevation so it
 follows the correct branch at overpasses.
 During intentional flight it holds neutral steering to keep the wings level.
+Shortcut runs also require real airborne samples and a landing near the intended
+rejoin at the correct elevation. Review the final HUD for lap 2/3: a proximity-based
+lap counter alone cannot prove that the game's required checkpoints were accepted.
+The route targets in `drive_route.py` only steer normal controls; they never set car
+positions, velocity, materials or checkpoint state. Three-dimensional discontinuities
+detect resets, including a car being returned upward from below the road.
 It brakes for upcoming curves and records slip angle, tire materials and suspension
 compression. Native material 0 is pavement; material 8 indicates a tire in the air.
 Away from the jump and its settling runout, it requires four-tire pavement contact

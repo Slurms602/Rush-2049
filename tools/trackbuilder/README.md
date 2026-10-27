@@ -10,7 +10,7 @@ From the repository root, with Python 3.10 or later:
 
 ```sh
 python3 -m pip install -r tools/trackbuilder/requirements.txt
-python3 tools/trackbuilder/build.py tracks/neon-skyway/track.json --out tracks/neon-skyway --version 2
+python3 tools/trackbuilder/build.py tracks/neon-skyway/track.json --out tracks/neon-skyway --version 3
 ```
 
 The command writes five `.LZS` files, `manifest.json` with SHA-256 checksums, and an SVG
@@ -20,7 +20,7 @@ checked-in bundle is ready to play; Python is needed only to edit and rebuild tr
 Chemical Circuit uses the same builder with a separate layout and artwork theme:
 
 ```sh
-python3 tools/trackbuilder/build.py tracks/chemical-circuit/track.json --id chemical-circuit --out tracks/chemical-circuit --version 1
+python3 tools/trackbuilder/build.py tracks/chemical-circuit/track.json --id chemical-circuit --out tracks/chemical-circuit --version 2
 ```
 
 Set `"theme": "chemical"` to generate blue steel, hazard stripes, orange pipework,
@@ -28,6 +28,27 @@ factory skylines and a purple liquid basin. Its nine scenery regions batch the p
 tanks and gantries to fit the native placement budget. The theme changes artwork and
 the fall-reset floor height; the driving surface remains pavement with exact contact
 planes. Road crossovers require at least 32 feet of vertical clearance.
+
+## Optional flying shortcuts
+
+Both shipped circuits have a separate green launch lane that skips a sequence of
+bends and lands back on the main road. `shortcuts` contains its `id`, `name`, `entry`,
+`rejoin`, open-ended `ramp` points, an optional `landing` deck, and `openings` in
+the main road's side rails. Landing points use the same fields as ramp points.
+Progress values such as `24.5` mean halfway between control points 24 and 25.
+An opening specifies `from`, `to` and side `L` or `R`, relative to forward travel.
+
+The ramp uses the same pavement/contact-plane code as the main road. Its green
+arrows and landing posts are decorative. Ramps are batched into existing road
+meshes, preserving the protected visibility prefix and native placement budget.
+The ramp and optional landing add collision; the flight between them has no deck.
+AI cars continue to use the main loop.
+
+Tracks with shortcuts must specify six ordered `checkpoints`, starting at progress
+zero. The validator rejects a shortcut that bypasses any required checkpoint.
+Forward and reverse checkpoint orders are emitted separately. Flying routes and
+the main loop both need a fresh-boot lap test; a geometric shortcut alone does not
+prove a legal or achievable lap. Green dashed lines in `preview.svg` show the cuts.
 
 ## Edit a track
 
@@ -53,6 +74,11 @@ all surface-local vertices have Y=0; averaging road-section normals can create c
 steps as a bank or grade changes. The validator rejects those off-plane vertices.
 Even correct collision can unload the tires over a sharp crest. Neon Skyway's revised
 layout uses flat cross-sections and gentle grades outside its intentional jump.
+
+Collision tree cells are filtered against actual polygons, including at elevated
+crossovers. Leaves are capped at 32 surfaces to stay within native contact-query
+scratch buffers; oversized lists can corrupt the game's stack. The builder splits
+dense cells further and rejects a layout that still cannot fit.
 
 For the browser selections, keep the bundle ID `neon-skyway` or `chemical-circuit` and
 slot 1. Rebuild into its matching `tracks/` directory; increment `--version` when

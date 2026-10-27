@@ -1,34 +1,34 @@
 {
   "id": "neon-skyway",
   "name": "Neon Skyway",
-  "version": 2,
+  "version": 3,
   "slot": 1,
   "lengthFeet": 7139,
   "files": [
     {
       "name": "TRACK1.LZS",
-      "bytes": 141745,
-      "sha256": "642432c25d35e8a3eb431de3a9096c6e80132a64ad56a3d278138bd48cb2ac27"
+      "bytes": 151553,
+      "sha256": "9e99da4e4feabd87134c6a2646bf2cbcdc91903c745ca0ea1b9597c077c6b1cc"
     },
     {
       "name": "TRACK1PATH.LZS",
-      "bytes": 10300,
-      "sha256": "33d21fd0f3110da76828730e8ee129bab1b2fedcbf0f56f0571d55e077d6a6fc"
+      "bytes": 10305,
+      "sha256": "fc21bdcd562be1595323b8b9dcedd09ea1fb65cf6cca7808eec1f819ade8db53"
     },
     {
       "name": "TRACK1PATHBACK.LZS",
-      "bytes": 10288,
-      "sha256": "311e9a598822ffe713d0782569d2df615eb70d451dcfc4e82775a8674f8a61d1"
+      "bytes": 10283,
+      "sha256": "9bc8082438b18c138223b0c6eb8b83641fb234aacce0ec8bba07fd3ea854733d"
     },
     {
       "name": "TRACK1ROAD.LZS",
-      "bytes": 175699,
-      "sha256": "7dd95ea50ad7081ae9cafa1bd7eb47e5b4741cd87828b53bfcec721cd5634b07"
+      "bytes": 170104,
+      "sha256": "9561c8ed4adc76e0a799d28ffeda306cd90d7f342c52173134efa6a47ce73c44"
     },
     {
       "name": "TRACK1WORLDS.LZS",
       "bytes": 3185,
-      "sha256": "231c052b09d1457986fd9a8e3017b42f37566d321020f4ed32656b300e11e5ce"
+      "sha256": "0b288f84850177f12f65748d82c49e04fa771fbb771ce87b7caaa13bcf3fd324"
     }
   ]
 }

@@ -58,6 +58,31 @@ class Road:
     def surface_vertices(self, i):
         return [self.vertex(k) for k in self.surface_indices(i)]
 
+    def leaves(self):
+        """Yield unique (file offset, expanded surface IDs) from the quadtree."""
+        seen = set()
+        for i in range(self.counts[1]):
+            o = self.tree_off + i * 20
+            flags = self.data[o + 3]
+            for q, child in enumerate(struct.unpack_from('<4H', self.data, o + 12)):
+                if flags & (1 << q):
+                    if child >= self.counts[1]: raise ValueError('Invalid collision tree child.')
+                    continue
+                if not child and not flags & (1 << (4 + q)): continue
+                off = self.rest_off + child + (0x10000 if flags & (1 << (4 + q)) else 0)
+                if off in seen: continue
+                seen.add(off)
+                count = self.data[off]; p = off + 1; ids = []
+                if count > 32:
+                    raise ValueError('Collision leaves exceed the native query buffer (32 surfaces).')
+                while len(ids) < count:
+                    value = int.from_bytes(self.data[p:p + 2], 'big'); p += 2
+                    first, run = value & 0x1fff, (value >> 13) + 1
+                    ids.extend(range(first, first + run))
+                if len(ids) != count or any(v >= self.counts[2] for v in ids):
+                    raise ValueError('Invalid collision leaf surface list.')
+                yield off, ids
+
 if __name__ == "__main__":
     sys.path.insert(0, __file__.rsplit("/", 1)[0])
     from lzs import decode

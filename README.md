@@ -13,15 +13,23 @@ Choose a circuit with the **Tracks** button, or open its link:
 
 - [Chemical Circuit](https://slurms602.github.io/Rush-2049/?track=chemical-circuit):
   blue steel roads, orange pipe gantries, purple chemical pools, linked esses,
-  three elevated crossovers and two wing jumps. The industrial artwork is original,
+  three elevated crossovers, two wing jumps and an optional flight past the upper
+  return esses. The industrial artwork is original,
   inspired by the atmosphere of Sonic's Chemical Plant Zone.
 - [Neon Skyway](https://slurms602.github.io/Rush-2049/?track=neon-skyway):
-  a floating technical circuit with alternating turns, braking corners and a wing jump.
+  a floating technical circuit with alternating turns, braking corners, a wing jump
+  and an optional air cut across the infield to bypass the far loop.
 
 For either custom circuit, select **Single Race → Marina (Track 1)** in the game.
 The selected circuit temporarily uses Marina's slot for that boot. Its files download
 automatically; your game image is never modified. **Play original tracks** restores
 the original disc content. Changing circuits restarts the game.
+
+Look for **green arrows and launch lanes** for the shortcuts. Carry speed onto the
+ramp, deploy the wings (**K**), and aim for the green landing posts. Neon Skyway's
+turnoff is on the **right before the far loop**; Chemical Circuit's is on the
+**right of the upper return, after the far-right loop**. The shortcuts bypass bends
+and rejoin before the next required checkpoint; the normal road remains available.
 
 For friends, reach the game's main menu before hosting, then use **Online → Host an
 online game**. The invite link includes the custom track selection. Each friend still

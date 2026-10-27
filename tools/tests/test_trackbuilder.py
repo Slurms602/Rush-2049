@@ -11,9 +11,11 @@ sys.path.insert(0, str(ROOT / "tools" / "trackbuilder"))
 from build import validate_description, validate_files
 from lzs import decode, encode
 from roadfile import Road
-from trackbuilder import Mesh, PVS_PREFIX_COUNT, road_file
+from trackbuilder import Mesh, PVS_PREFIX_COUNT, road_file, resample, frames, ribbon_collision, path_file
 from trackfile import Track
 from worldsfile import Worlds
+from pathfile import Path as TrackPath
+from shortcuts import checkpoint_indices
 
 
 class TrackBuilderTests(unittest.TestCase):
@@ -68,6 +70,68 @@ class TrackBuilderTests(unittest.TestCase):
         for p in description["points"]: p["y"] = 600
         with self.assertRaisesRegex(ValueError, "vertical clearance"):
             validate_description(description)
+
+    def test_collision_leaf_filter_keeps_surfaces_and_rejects_native_overflow(self):
+        # Long diagonal triangles have heavily overlapping bounding boxes, but
+        # small spatial cells should include only the nearby actual surfaces.
+        polygons = [([[0, 600, z], [300, 600, z + 300], [0, 600, z + 8]], [0, 1, 0], 0)
+                    for z in range(0, 120, 3)]
+        road = Road(road_file(polygons))
+        leaves = dict(road.leaves())
+        self.assertLessEqual(max(map(len, leaves.values())), 32)
+        for surface, (points, _, _) in enumerate(polygons):
+            x = sum(p[0] for p in points) / 3; z = sum(p[2] for p in points) / 3; i = 0
+            while True:
+                _, _, flags, x0, x1, z0, z1, *children = struct.unpack_from(
+                    '<hBB4h4H', road.data, road.tree_off + i * 20)
+                q = int(x >= int((x0 + x1) / 2)) + 2 * int(z < int((z0 + z1) / 2))
+                child = children[q]
+                if flags & (1 << q): i = child; continue
+                offset = road.rest_off + child + (0x10000 if flags & (1 << (q + 4)) else 0)
+                self.assertIn(surface, leaves[offset]); break
+        data = bytearray(road.data); data[next(iter(leaves))] = 33
+        with self.assertRaisesRegex(ValueError, 'native query buffer'):
+            list(Road(data).leaves())
+
+    def test_shortcuts_cannot_bypass_a_required_checkpoint(self):
+        for name in ("neon-skyway", "chemical-circuit"):
+            d = json.loads((ROOT / f"tracks/{name}/track.json").read_text())
+            sec, _ = validate_description(d)
+            self.assertTrue(d["shortcuts"])
+            branch = d["shortcuts"][0]
+            next_gate = next(i for i, value in enumerate(d["checkpoints"]) if value > branch["entry"])
+            d["checkpoints"][next_gate] = (branch["entry"] + branch["rejoin"]) / 2
+            with self.subTest(track=name), self.assertRaisesRegex(ValueError, "required checkpoint"):
+                validate_description(d)
+
+    def test_open_ramp_has_no_invisible_closing_collision_wall(self):
+        d = {"points": self.description["shortcuts"][0]["ramp"]}
+        sec, _ = resample(d, closed=False)
+        frames(sec, closed=False)
+        road = Road(road_file(ribbon_collision(sec, closed=False)))
+        # Only the authored launch lane exists: no last-to-first slab across its
+        # turnoff, and no side wall blocking access from the main road.
+        self.assertEqual(road.counts[2], 2 * (len(sec) - 1))
+        self.assertTrue(all(road.surface(i)[0] == 0 for i in range(road.counts[2])))
+        for i in range(road.counts[2]):
+            self.assertTrue(all(abs(v[1]) <= 1 / 32 for v in road.surface_vertices(i)[1:]))
+
+    def test_shortcuts_cannot_overlap_in_progress(self):
+        d = json.loads((ROOT / "tracks/neon-skyway/track.json").read_text())
+        d["shortcuts"].append(dict(d["shortcuts"][0], id="overlap"))
+        with self.assertRaisesRegex(ValueError, "cannot overlap"):
+            validate_description(d)
+
+    def test_reverse_checkpoints_keep_finish_and_reverse_the_required_gates(self):
+        sec, total = validate_description(self.description)
+        indices = checkpoint_indices(self.description, sec)
+        forward = TrackPath(path_file(sec, total, checkpoints=indices))
+        backward = TrackPath(path_file(sec, total, reverse=True, checkpoints=indices))
+        self.assertEqual(backward.checkpoints[0]["pos"], forward.checkpoints[0]["pos"])
+        self.assertEqual([q["pos"] for q in backward.checkpoints[1:]],
+                         [q["pos"] for q in forward.checkpoints[:0:-1]])
+        for a, b in zip(backward.checkpoints, forward.checkpoints[:1] + forward.checkpoints[:0:-1]):
+            self.assertEqual(a["dir"], tuple(-v for v in b["dir"]))
 
     def test_banked_triangles_use_their_geometric_contact_plane(self):
         # A changing bank twists a road quad. The average section normal is

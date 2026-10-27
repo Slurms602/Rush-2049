@@ -3,8 +3,8 @@
     "use strict";
     const catalog = Object.freeze({
         "original": { name: "Original tracks", description: "Play the game's original tracks." },
-        "neon-skyway": { name: "Neon Skyway", description: "Floating neon roads, alternating esses and braking corners." },
-        "chemical-circuit": { name: "Chemical Circuit", description: "A chemical works circuit with purple pools, orange pipes, elevated crossovers and two wing jumps." }
+        "neon-skyway": { name: "Neon Skyway", description: "Floating neon roads, alternating esses, a wing jump and an optional flying shortcut across the infield." },
+        "chemical-circuit": { name: "Chemical Circuit", description: "Purple pools, orange pipes, elevated crossovers, two wing jumps and an optional flyover past the upper return bends." }
     });
     let id = new URLSearchParams(location.search).get("track") || "original";
     const track = window.DC_TRACK = { id, name: catalog[id]?.name || id, catalog, ready: false, fingerprint: null };

@@ -19,6 +19,7 @@ from roadfile import Road
 from trackfile import Track
 from worldsfile import Worlds
 from trackbuilder import build, resample, frames, PVS_PREFIX_COUNT, PVS_PADDING_NAME
+import shortcuts
 
 
 def validate_description(desc):
@@ -49,6 +50,7 @@ def validate_description(desc):
     if not 1500 <= total <= 10000:
         raise ValueError("The supported track length is 1500 to 10000 ft.")
     frames(sec)
+    shortcuts.validate(desc, sec)
     if any(not np.isfinite(s["L"]).all() or not np.isfinite(s["R"]).all() for s in sec):
         raise ValueError("The road contains a vertical or degenerate cross-section.")
     # Grid slots are derived from checkpoint zero; reserve the opening straight.
@@ -116,6 +118,7 @@ def validate_files(files):
         if any(x != 0xffff and x >= len(world.records) for x in (nxt, child)):
             raise ValueError("Invalid world sibling or child link.")
     road = Road(decoded["TRACK1ROAD.LZS"])
+    list(road.leaves())  # Reject oversized native stack queries and invalid surface references.
     for i in range(road.counts[2]):
         if any(v >= road.counts[3] for v in road.surface_indices(i)):
             raise ValueError("Invalid collision vertex index.")
@@ -146,7 +149,7 @@ def validate_files(files):
             raise ValueError(f"{name} expands to {len(data)} bytes; slot 1 allows {decoded_budgets[name]}.")
 
 
-def preview(sec, total, target, name="Neon Skyway"):
+def preview(sec, total, target, name="Neon Skyway", desc=None):
     x = [s["pos"][0] for s in sec]; z = [s["pos"][2] for s in sec]
     lo_x, lo_z = min(x) - 220, min(z) - 220
     width, height = max(x) - lo_x + 220, max(z) - lo_z + 220
@@ -162,11 +165,18 @@ def preview(sec, total, target, name="Neon Skyway"):
             for side in ("L", "R"):
                 p, q = a[side], b[side]
                 parts.append(f'<path d="M{p[0]:.1f},{p[2]:.1f} L{q[0]:.1f},{q[2]:.1f}" stroke="#78e9ff" stroke-width="4"/>')
-    for i in range(6):
-        p = sec[int(i * len(sec) / 6)]["pos"]
+    if desc:
+        for branch in shortcuts.prepare(desc, sec):
+            points = [q["pos"] for q in branch["sections"] + branch["landing"]] + [sec[branch["rejoin"]]["pos"]]
+            coords = " ".join(f'{p[0]:.1f},{p[2]:.1f}' for p in points)
+            parts.append(f'<polyline points="{coords}" fill="none" stroke="#abff4c" stroke-width="14" stroke-dasharray="24 14"/>')
+    indices = shortcuts.checkpoint_indices(desc, sec) if desc else None
+    for i, idx in enumerate(indices or [int(i * len(sec) / 6) for i in range(6)]):
+        p = sec[idx]["pos"]
         parts.append(f'<circle cx="{p[0]:.1f}" cy="{p[2]:.1f}" r="32" fill="#{"ffffff" if i == 0 else "ffba62"}"/>')
         parts.append(f'<text x="{p[0]:.1f}" y="{p[2] + 12:.1f}" text-anchor="middle" font-size="36" font-family="sans-serif" fill="#101427">{i + 1}</text>')
-    parts.append(f'<text x="{lo_x + 60:.1f}" y="{lo_z + height - 55:.1f}" fill="#b4c6e3" font-size="45" font-family="sans-serif">{total:.0f} ft · 6 checkpoints · pink = wing jump</text></svg>')
+    legend = " · green = optional flight" if desc and desc.get("shortcuts") else ""
+    parts.append(f'<text x="{lo_x + 60:.1f}" y="{lo_z + height - 55:.1f}" fill="#b4c6e3" font-size="36" font-family="sans-serif">{total:.0f} ft · pink = wing jump{legend}</text></svg>')
     target.write_text("\n".join(parts), encoding="utf-8")
 
 
@@ -190,7 +200,7 @@ def main():
     for name, data in sorted(files.items()):
         (args.out / name).write_bytes(data)
         manifest["files"].append(dict(name=name, bytes=len(data), sha256=hashlib.sha256(data).hexdigest()))
-    preview(sec, total, args.out / "preview.svg", desc["name"])
+    preview(sec, total, args.out / "preview.svg", desc["name"], desc)
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"Validated bundle: {args.out / 'manifest.json'}")
 
