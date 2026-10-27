@@ -72,13 +72,28 @@
             const rec = dir.records.find((r) => r.name === name);
             if (!rec) throw new Error(f.name + " is not on the disc");
             if (f.data.length > Math.ceil(rec.size / SECTOR) * SECTOR) throw new Error(f.name + " is bigger than the original");
-            planned.push({ f, rec });
+            const aliases = [];
+            if (f.aliases !== undefined) {
+                if (!name.endsWith(".STR") || !Array.isArray(f.aliases) || f.aliases.length > 32) throw new Error("Invalid soundtrack aliases");
+                for (const alias of f.aliases) {
+                    if (typeof alias !== "string" || !/^[A-Z0-9]+\.STR$/.test(alias) || names.has(alias)) throw new Error("Invalid or duplicate soundtrack alias");
+                    const target = dir.records.find(r => r.name === alias);
+                    if (!target) throw new Error(alias + " is not on the disc");
+                    names.add(alias); aliases.push(target);
+                }
+            }
+            planned.push({ f, rec, aliases });
         }
         // Validate the whole bundle before changing any sectors. A bad last file must not
         // leave the first four installed and let players unknowingly race a mixed track.
-        for (const { f, rec } of planned) {
+        for (const { f, rec, aliases } of planned) {
             patch(rec.lba, f.data);
             setBoth(dir.data, rec.off + 10, f.data.length);
+            // Share one native audio extent; do not allocate 18 copies of the PCM.
+            for (const alias of aliases) {
+                setBoth(dir.data, alias.off + 2, rec.lba);
+                setBoth(dir.data, alias.off + 10, f.data.length);
+            }
         }
         patch(dir.lba, dir.data);
         console.log("[mods] installed " + files.map((f) => f.name).join(", "));

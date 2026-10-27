@@ -11,6 +11,13 @@ Other Dreamcast games boot too, but online play has only been tested with Rush 2
 
 Choose a circuit with the **Tracks** button, or open its link:
 
+- **[Doodle Dimension](https://slurms602.github.io/Rush-2049/?track=doodle-dimension)**:
+  a 7,243-foot illustrated circuit inspired by `track.jpg`, with cyan and cream tile
+  roads, ink outlines, bubble skies, sculptural grid arches, giant grinning portals
+  and a shark lagoon. The audio in `track.webm` loops as its browser soundtrack.
+  It plays inside the game through the native Dreamcast audio mixer, including
+  the normal music volume controls. All music selections use this soundtrack
+  during a Doodle Dimension boot. Select **Single Race → Marina (Track 1)**.
 - [Chemical Circuit](https://slurms602.github.io/Rush-2049/?track=chemical-circuit):
   blue steel roads, orange pipe gantries, purple chemical pools, linked esses,
   three elevated crossovers, two wing jumps and an optional flight past the upper
@@ -20,7 +27,7 @@ Choose a circuit with the **Tracks** button, or open its link:
   a floating technical circuit with alternating turns, braking corners, a wing jump
   and an optional air cut across the infield to bypass the far loop.
 
-For either custom circuit, select **Single Race → Marina (Track 1)** in the game.
+For any custom circuit, select **Single Race → Marina (Track 1)** in the game.
 The selected circuit temporarily uses Marina's slot for that boot. Its files download
 automatically; your game image is never modified. **Play original tracks** restores
 the original disc content. Changing circuits restarts the game.

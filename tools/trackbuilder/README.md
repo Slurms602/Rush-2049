@@ -80,7 +80,7 @@ crossovers. Leaves are capped at 32 surfaces to stay within native contact-query
 scratch buffers; oversized lists can corrupt the game's stack. The builder splits
 dense cells further and rejects a layout that still cannot fit.
 
-For the browser selections, keep the bundle ID `neon-skyway` or `chemical-circuit` and
+For the browser selections, keep the bundle ID `neon-skyway`, `chemical-circuit` or `doodle-dimension` and
 slot 1. Rebuild into its matching `tracks/` directory; increment `--version` when
 publishing a changed track. The
 browser also verifies the actual file hashes, so different builds cannot join the same
@@ -122,3 +122,33 @@ a fresh boot. The title screen's attract sequence can cache Marina's original da
 loading a save state made in original mode can therefore mix original and custom assets.
 
 See [runtime checks](../tests/README.md) for fresh-boot driving and two-client online tests.
+
+## Doodle Dimension
+
+```sh
+python3 tools/trackbuilder/build.py tracks/doodle-dimension/track.json --id doodle-dimension --out tracks/doodle-dimension
+```
+
+The `doodle` theme in `doodle_theme.py` uses Pillow to create ink-outlined tile and
+bubble textures and crops landmark murals from the supplied root `track.jpg`.
+Scenery batches sculptural arches, bubble clusters, murals and the lagoon into nine
+placements. The continuous road has six checkpoints and no mandatory jumps.
+The soundtrack is a native Sega Audio64 `.STR` stream, built entirely from the
+supplied audio. Rebuild it with FFmpeg installed:
+
+```sh
+python3 tools/trackbuilder/music.py track.webm --out tracks/doodle-dimension/SOUNDTRACK.STR
+python3 tools/trackbuilder/build.py tracks/doodle-dimension/track.json --id doodle-dimension --out tracks/doodle-dimension --version 2
+```
+
+The format is 44.1 kHz stereo PCM16 with 16 KiB channel blocks, a 2 KiB header
+and two lead-in blocks. `SOUNDTRACK.json` records its integrity and native stream
+aliases; geometry rebuilds include it in `manifest.json`. The loader verifies
+its hash before boot, includes it and its aliases in the room fingerprint, and
+patches one disc extent shared by the game's 18 music selections. Menus and
+races therefore use the supplied music during this custom-track boot. Original
+mode retains the original music. The game's own mixer and Music volume control
+handle playback; no browser audio element is used.
+
+Format references: FFmpeg `libavformat/dcstr.c` and vgmstream
+`src/meta/str_sega.c`, corroborated against the owner's US v1.001 disc headers.

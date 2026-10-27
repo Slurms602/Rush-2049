@@ -82,18 +82,18 @@ test("setup selection preserves the invite and can change before boot without re
     assert.equal(new URL(c.DC_TRACK.url("original")).searchParams.has("join"), false);
 });
 
-function modDisc() {
+function modDisc(discNames = names) {
     const sector = 2048, directoryLBA = 45100, directory = new Uint8Array(sector), pvd = new Uint8Array(sector);
     pvd.set([1, 67, 68, 48, 48, 49, 1]);
     const pv = new DataView(pvd.buffer);
     pv.setUint32(158, directoryLBA, true); pv.setUint32(166, sector, true);
     let off = 0;
-    for (const [i, name] of names.entries()) {
+    for (const [i, name] of discNames.entries()) {
         const len = 34 + name.length;
         directory[off] = len; directory[off + 32] = name.length;
         directory.set(Buffer.from(name), off + 33);
         const dv = new DataView(directory.buffer, off);
-        dv.setUint32(2, 45200 + i, true); dv.setUint32(10, sector, true);
+        dv.setUint32(2, 45200 + i, true); dv.setUint32(6, 45200 + i, false); dv.setUint32(10, sector, true);
         off += len;
     }
     const patches = [], heap = new Uint8Array(1024 * 1024);
@@ -226,4 +226,53 @@ test("purple sky bands keep the two-player race cropped to each player's view", 
 test("pause menu outlines and black loading screens still show the complete screen", () => {
     assert.equal(detectView({ pause: true }), null);
     assert.equal(detectView({ black: true }), null);
+});
+
+test('Doodle Dimension installs its shipped files with verified hashes and its own room identity', async () => {
+    const { c, installed } = loader({ select: 'doodle-dimension' });
+    c.fetch = async (url) => {
+        const filename = new URL(url).pathname.split('/').pop();
+        return new Response(fs.readFileSync(path.join(root, 'tracks/doodle-dimension', filename)));
+    };
+    await c.DC_TRACK.install();
+    assert.equal(c.DC_TRACK.name, 'Doodle Dimension');
+    assert.equal(installed[0].length, 6);
+    assert.equal(installed[0][5].aliases.length, 17);
+    assert.match(c.DC_TRACK.fingerprint, /^doodle-dimension:2:[a-f0-9]{64}$/);
+    assert.equal(new URL(c.DC_TRACK.url('doodle-dimension', { leaveRoom: false })).searchParams.get('join'), 'ABCDE');
+});
+
+
+test('native soundtrack aliases share one patched extent and invalid aliases leave the disc intact', () => {
+    const streams = ['BASSY.STR', 'FLIER.STR', 'MORNING.STR'];
+    const { c, patches } = modDisc(streams);
+    c.DC_MODS.install([{ name: streams[0], data: new Uint8Array(100), aliases: streams.slice(1) }]);
+    assert.equal(patches.length, 2);
+    const bytes = patches[1].data; let off = 0;
+    for (const name of streams) {
+        const v = new DataView(bytes.buffer, off);
+        assert.equal(v.getUint32(2, true), 45200);
+        assert.equal(v.getUint32(6, false), 45200);
+        assert.equal(v.getUint32(10, true), 100);
+        assert.equal(v.getUint32(14, false), 100);
+        off += 34 + name.length;
+    }
+    for (const aliases of [['MISSING.STR'], ['FLIER.STR', 'FLIER.STR'], ['../GAME.BIN']]) {
+        const bad = modDisc(streams);
+        assert.throws(() => bad.c.DC_MODS.install([{ name: streams[0], data: new Uint8Array(100), aliases }]));
+        assert.equal(bad.patches.length, 0);
+    }
+});
+
+test('a corrupt soundtrack prevents all installation', async () => {
+    const { c, installed } = loader({ select: 'doodle-dimension' });
+    c.fetch = async (url) => {
+        const filename = new URL(url).pathname.split('/').pop();
+        const data = fs.readFileSync(path.join(root, 'tracks/doodle-dimension', filename));
+        if (filename === 'SOUNDTRACK.STR') data[2048] ^= 1;
+        return new Response(data);
+    };
+    await assert.rejects(c.DC_TRACK.install(), /incomplete or out of date/);
+    assert.equal(installed.length, 0);
+    assert.equal(c.DC_TRACK.ready, false);
 });

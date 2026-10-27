@@ -28,8 +28,8 @@ def validate_description(desc):
         raise ValueError("Use 4 to 128 control points in a closed loop (do not repeat the first point).")
     if desc.get("slot", 1) != 1:
         raise ValueError("The browser's custom track mode currently uses slot 1.")
-    if desc.get("theme", "neon") not in ("neon", "chemical"):
-        raise ValueError("Supported themes are neon and chemical.")
+    if desc.get("theme", "neon") not in ("neon", "chemical", "doodle"):
+        raise ValueError("Supported themes are neon, chemical and doodle.")
     for i, p in enumerate(points):
         for key in ("x", "y", "z"):
             v = p.get(key)
@@ -200,6 +200,14 @@ def main():
     for name, data in sorted(files.items()):
         (args.out / name).write_bytes(data)
         manifest["files"].append(dict(name=name, bytes=len(data), sha256=hashlib.sha256(data).hexdigest()))
+    # Preserve an independently built soundtrack across geometry rebuilds.
+    music_metadata = args.out / "SOUNDTRACK.json"
+    if music_metadata.exists():
+        music = json.loads(music_metadata.read_text())
+        audio = (args.out / music["url"]).read_bytes()
+        if len(audio) != music["bytes"] or hashlib.sha256(audio).hexdigest() != music["sha256"]:
+            raise ValueError("Soundtrack metadata does not match its bytes")
+        manifest["music"] = music
     preview(sec, total, args.out / "preview.svg", desc["name"], desc)
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"Validated bundle: {args.out / 'manifest.json'}")

@@ -1,0 +1,59 @@
+{
+  "id": "doodle-dimension",
+  "name": "Doodle Dimension",
+  "version": 2,
+  "slot": 1,
+  "lengthFeet": 7243,
+  "files": [
+    {
+      "name": "TRACK1.LZS",
+      "bytes": 227341,
+      "sha256": "0e9f0c03f8c07fe5ae55d3fb7672b6f58f4c464695e40a1088c7a6afaf956dbb"
+    },
+    {
+      "name": "TRACK1PATH.LZS",
+      "bytes": 10535,
+      "sha256": "cf6b27be96319027c9cfcf252b0729a6cb56f4cfd19c5656de37ce232cf4a6bd"
+    },
+    {
+      "name": "TRACK1PATHBACK.LZS",
+      "bytes": 10527,
+      "sha256": "faa2c1b3b86148d3d6c15aebbb468972e13b3a0dcdaa6981443b6af1f366b104"
+    },
+    {
+      "name": "TRACK1ROAD.LZS",
+      "bytes": 167739,
+      "sha256": "b22a4493d754bb1cad7547ba9609745c72dd878d0ac6a63b782380ac7b891d30"
+    },
+    {
+      "name": "TRACK1WORLDS.LZS",
+      "bytes": 3480,
+      "sha256": "89c8771ad109750eb4e31f22f2eafb29298a5f9e1f18fc52f654f21fc7b015a6"
+    }
+  ],
+  "music": {
+    "name": "BASSY.STR",
+    "url": "SOUNDTRACK.STR",
+    "bytes": 32802816,
+    "sha256": "4e124ad6bd16f226781ad4940d2e38430de2a8a42c507cdd08bd8bfcbc064366",
+    "aliases": [
+      "FLIER.STR",
+      "GARAGE.STR",
+      "HIDDEN.STR",
+      "HIGH.STR",
+      "MORNING.STR",
+      "NIGHT.STR",
+      "NOON.STR",
+      "ROBO.STR",
+      "SPEED.STR",
+      "STARSKY.STR",
+      "STUNTED.STR",
+      "SUNSET.STR",
+      "THEROCK.STR",
+      "TRANCEY.STR",
+      "VICE.STR",
+      "WARRIOR.STR",
+      "WINGEY.STR"
+    ]
+  }
+}
