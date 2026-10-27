@@ -2,6 +2,7 @@
 """Build and validate an original custom track, then write its integrity manifest."""
 import argparse
 import hashlib
+import html
 import json
 import math
 import os
@@ -26,6 +27,8 @@ def validate_description(desc):
         raise ValueError("Use 4 to 128 control points in a closed loop (do not repeat the first point).")
     if desc.get("slot", 1) != 1:
         raise ValueError("The browser's custom track mode currently uses slot 1.")
+    if desc.get("theme", "neon") not in ("neon", "chemical"):
+        raise ValueError("Supported themes are neon and chemical.")
     for i, p in enumerate(points):
         for key in ("x", "y", "z"):
             v = p.get(key)
@@ -51,6 +54,28 @@ def validate_description(desc):
     # Grid slots are derived from checkpoint zero; reserve the opening straight.
     if any(s["gap"] for s in sec[:15] + sec[-15:]):
         raise ValueError("Keep 150 ft of solid road on either side of the start/finish.")
+    # Distinct road branches may cross in X/Z, but need room for the slab and
+    # a car beneath the bridge. Broad-phase arrays avoid an expensive pair loop.
+    positions = np.array([s["pos"] for s in sec])
+    ends = np.roll(positions, -1, axis=0)
+    lo, hi = np.minimum(positions[:, [0, 2]], ends[:, [0, 2]]), np.maximum(positions[:, [0, 2]], ends[:, [0, 2]])
+    indices = np.arange(len(sec))
+    cross = lambda a, b: a[0] * b[1] - a[1] * b[0]
+    for i, a in enumerate(positions):
+        candidates = np.where((indices > i + 15) & (indices < i + len(sec) - 15)
+                              & np.all(hi >= lo[i], axis=1) & np.all(lo <= hi[i], axis=1))[0]
+        ab = (ends[i] - a)[[0, 2]]
+        for j in candidates:
+            cd = (ends[j] - positions[j])[[0, 2]]
+            det = cross(ab, cd)
+            if abs(det) < 1e-8: continue
+            ac = (positions[j] - a)[[0, 2]]
+            u, v = cross(ac, cd) / det, cross(ac, ab) / det
+            if 0 <= u <= 1 and 0 <= v <= 1:
+                y0 = a[1] + u * (ends[i, 1] - a[1])
+                y1 = positions[j, 1] + v * (ends[j, 1] - positions[j, 1])
+                if abs(y0 - y1) < 32:
+                    raise ValueError("Road crossings need at least 32 ft of vertical clearance.")
     return sec, total
 
 
@@ -121,11 +146,11 @@ def validate_files(files):
             raise ValueError(f"{name} expands to {len(data)} bytes; slot 1 allows {decoded_budgets[name]}.")
 
 
-def preview(sec, total, target):
+def preview(sec, total, target, name="Neon Skyway"):
     x = [s["pos"][0] for s in sec]; z = [s["pos"][2] for s in sec]
     lo_x, lo_z = min(x) - 220, min(z) - 220
     width, height = max(x) - lo_x + 220, max(z) - lo_z + 220
-    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{lo_x} {lo_z} {width} {height}" role="img" aria-label="Neon Skyway track layout">',
+    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{lo_x} {lo_z} {width} {height}" role="img" aria-label="{html.escape(name, quote=True)} track layout">',
              f'<rect x="{lo_x}" y="{lo_z}" width="{width}" height="{height}" fill="#101427"/>']
     for i, a in enumerate(sec):
         b = sec[(i + 1) % len(sec)]
@@ -165,7 +190,7 @@ def main():
     for name, data in sorted(files.items()):
         (args.out / name).write_bytes(data)
         manifest["files"].append(dict(name=name, bytes=len(data), sha256=hashlib.sha256(data).hexdigest()))
-    preview(sec, total, args.out / "preview.svg")
+    preview(sec, total, args.out / "preview.svg", desc["name"])
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"Validated bundle: {args.out / 'manifest.json'}")
 

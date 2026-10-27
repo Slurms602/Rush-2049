@@ -16,10 +16,17 @@ save states may contain private game data.
 ```sh
 node tools/tests/custom-track-drive.cjs http://localhost:8080/ /tmp/rush-driving
 node tools/tests/custom-track-online.cjs http://localhost:8080/ /tmp/rush-online
+
+# The URL chooses another circuit; both scripts default to Neon Skyway.
+node tools/tests/custom-track-drive.cjs 'http://localhost:8080/?track=chemical-circuit' /tmp/rush-chemical-driving
+node tools/tests/custom-track-online.cjs 'http://localhost:8080/?track=chemical-circuit' /tmp/rush-chemical-online
 ```
 
 The driving bot steers from the car's wheel positions in actual Dreamcast RAM. It must
 complete a forward lap, cross the gap and remain at road altitude without respawning.
+Every separate gap must be crossed. Its nearest-road lookup includes elevation so it
+follows the correct branch at overpasses.
+During intentional flight it holds neutral steering to keep the wings level.
 It brakes for upcoming curves and records slip angle, tire materials and suspension
 compression. Native material 0 is pavement; material 8 indicates a tire in the air.
 Away from the jump and its settling runout, it requires four-tire pavement contact

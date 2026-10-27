@@ -475,12 +475,22 @@ def build(desc, outdir):
     if slot != 1:
         raise ValueError("This builder currently supports Marina (slot 1) only.")
     sec, total = resample(desc); frames(sec)
-    textures = make_textures(); tex_ids = {t[0]: i for i, t in enumerate(textures)}
+    textures = make_textures()
+    chemical = desc.get("theme") == "chemical"
+    if chemical:
+        import chemical_theme
+        textures = chemical_theme.textures(textures, vq_encode)
+    tex_ids = {t[0]: i for i, t in enumerate(textures)}
     meshes = build_meshes(sec, tex_ids, total)
     sky, low, span, c = sky_and_void(sec, tex_ids)
+    if chemical:
+        low = min(s["pos"][1] for s in sec) - 160
+        sky = chemical_theme.sky(sec, tex_ids, Mesh)
     # Objects named TRACKnL... come from this track's file; any other name (except SKYSKY) is a
     # shared object (coins, cones...), and the game waits forever for one that doesn't exist.
     objects = [(f"TRACK{slot}L{i + 1:05d}", m) for i, m in enumerate(meshes)][:desc.get("max_objects", 10**6)]
+    if chemical:
+        objects += chemical_theme.scenery(sec, tex_ids, Mesh, low)
     objects, placements = reserve_visibility_slots(objects, tex_ids, low, c)
     if desc.get("sky", True): objects.append(("SKYSKY", sky))
     files = {

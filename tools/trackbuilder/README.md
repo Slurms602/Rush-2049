@@ -17,6 +17,18 @@ The command writes five `.LZS` files, `manifest.json` with SHA-256 checksums, an
 layout preview. It checks the complete bundle before replacing the existing files. The
 checked-in bundle is ready to play; Python is needed only to edit and rebuild tracks.
 
+Chemical Circuit uses the same builder with a separate layout and artwork theme:
+
+```sh
+python3 tools/trackbuilder/build.py tracks/chemical-circuit/track.json --id chemical-circuit --out tracks/chemical-circuit --version 1
+```
+
+Set `"theme": "chemical"` to generate blue steel, hazard stripes, orange pipework,
+factory skylines and a purple liquid basin. Its nine scenery regions batch the pools,
+tanks and gantries to fit the native placement budget. The theme changes artwork and
+the fall-reset floor height; the driving surface remains pavement with exact contact
+planes. Road crossovers require at least 32 feet of vertical clearance.
+
 ## Edit a track
 
 Copy `tracks/neon-skyway/track.json` and edit its `points` array. Each point has `x`, `y`,
@@ -42,8 +54,9 @@ steps as a bank or grade changes. The validator rejects those off-plane vertices
 Even correct collision can unload the tires over a sharp crest. Neon Skyway's revised
 layout uses flat cross-sections and gentle grades outside its intentional jump.
 
-For the existing browser selection, keep the bundle ID `neon-skyway` and slot 1. Rebuild
-into `tracks/neon-skyway`; increment `--version` when publishing a changed track. The
+For the browser selections, keep the bundle ID `neon-skyway` or `chemical-circuit` and
+slot 1. Rebuild into its matching `tracks/` directory; increment `--version` when
+publishing a changed track. The
 browser also verifies the actual file hashes, so different builds cannot join the same
 online match even if their version numbers match.
 

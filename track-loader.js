@@ -1,8 +1,13 @@
 // Load only authored track files. Game and BIOS data always come from the player's disc.
 (function () {
     "use strict";
+    const catalog = Object.freeze({
+        "original": { name: "Original tracks", description: "Play the game's original tracks." },
+        "neon-skyway": { name: "Neon Skyway", description: "Floating neon roads, alternating esses and braking corners." },
+        "chemical-circuit": { name: "Chemical Circuit", description: "A chemical works circuit with purple pools, orange pipes, elevated crossovers and two wing jumps." }
+    });
     let id = new URLSearchParams(location.search).get("track") || "original";
-    const track = window.DC_TRACK = { id, name: id === "original" ? "Original tracks" : "Neon Skyway", ready: false, fingerprint: null };
+    const track = window.DC_TRACK = { id, name: catalog[id]?.name || id, catalog, ready: false, fingerprint: null };
     const expected = ["TRACK1.LZS", "TRACK1ROAD.LZS", "TRACK1PATH.LZS", "TRACK1PATHBACK.LZS", "TRACK1WORLDS.LZS"];
     const hex = (bytes) => Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, "0")).join("");
     const sha = async (bytes) => hex(await crypto.subtle.digest("SHA-256", bytes));
@@ -10,10 +15,10 @@
 
     track.select = function (selection) {
         if (prepared) throw new Error("Changing tracks after boot requires restarting the game");
-        if (!["original", "neon-skyway"].includes(selection)) throw new Error("Unknown custom track: " + selection);
+        if (!Object.hasOwn(catalog, selection)) throw new Error("Unknown custom track: " + selection);
         id = selection;
         track.id = id;
-        track.name = id === "original" ? "Original tracks" : "Neon Skyway";
+        track.name = catalog[id].name;
     };
 
     async function fetchOK(url) {
@@ -26,7 +31,7 @@
         if (prepared) return prepared;
         prepared = (async () => {
             if (id === "original") { track.fingerprint = "original"; return []; }
-            if (id !== "neon-skyway") throw new Error("Unknown custom track: " + id);
+            if (!Object.hasOwn(catalog, id)) throw new Error("Unknown custom track: " + id);
             const base = new URL("tracks/" + id + "/", location.href);
             const manifest = await (await fetchOK(new URL("manifest.json", base))).json();
             if (manifest.id !== id || manifest.slot !== 1 || !Number.isSafeInteger(manifest.version) || manifest.version < 1

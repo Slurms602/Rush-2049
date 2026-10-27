@@ -14,7 +14,7 @@ const turn = () => new Promise(setImmediate);
 
 function loader({ corrupt = false, missing = false, select = "neon-skyway" } = {}) {
     const data = new Uint8Array([1, 2, 3]), installed = [];
-    const manifest = { id: "neon-skyway", name: "Neon Skyway", version: 1, slot: 1,
+    const manifest = { id: select === "original" ? "neon-skyway" : select, version: 1, slot: 1,
         files: names.map((name) => ({ name, bytes: data.length, sha256: digest(data) })) };
     if (missing) manifest.files.pop();
     const c = vm.createContext({ URL, URLSearchParams, Uint8Array, TextEncoder, crypto: webcrypto,
@@ -47,6 +47,16 @@ test("corrupt and incomplete bundles never install", async () => {
         assert.equal(installed.length, 0);
         assert.equal(c.DC_TRACK.ready, false);
     }
+});
+
+test("chemical track has its own catalog entry, bundle identity and invite selection", async () => {
+    const a = loader({ select: "chemical-circuit" }), b = loader();
+    await a.c.DC_TRACK.install(); await b.c.DC_TRACK.install();
+    assert.equal(a.c.DC_TRACK.name, "Chemical Circuit");
+    assert.equal(a.installed[0].length, 5);
+    assert.match(a.c.DC_TRACK.fingerprint, /^chemical-circuit:1:[a-f0-9]{64}$/);
+    assert.notEqual(a.c.DC_TRACK.fingerprint, b.c.DC_TRACK.fingerprint);
+    assert.equal(new URL(a.c.DC_TRACK.url("chemical-circuit", { leaveRoom: false })).searchParams.get("join"), "ABCDE");
 });
 
 test("original mode requires no downloaded files; unknown selections fail", async () => {
@@ -150,7 +160,7 @@ function network() {
             Uint8Array, Peer, location: new URL("https://example.test/Rush-2049/?track=neon-skyway"),
             setInterval: () => 0, clearInterval() {}, setTimeout: () => 0, clearTimeout() {},
             document: { getElementById: (id) => elements.get(id) || null },
-            DC_TRACK: { id: fingerprint === "original" ? "original" : "neon-skyway", ready: true, fingerprint },
+            DC_TRACK: { id: fingerprint.split(":")[0], ready: true, fingerprint },
             EJS_emulator: { gameManager: { Module: { _fly_set_lockstep() {} }, simulateInput() {},
                 getState: () => new Uint8Array([1, 2, 3]), loadState() { loads++; }, setVSync() {}, setVariable() {} } } });
         c.window = c; vm.runInContext(source("netplay.js"), c);
@@ -160,7 +170,7 @@ function network() {
 }
 
 test("online rejects original/custom and different custom builds before transferring state", async () => {
-    for (const other of ["original", "neon-skyway:1:other-build"]) {
+    for (const other of ["original", "neon-skyway:1:other-build", "chemical-circuit:1:verified-build"]) {
         const { page, sent } = network(), host = page("neon-skyway:1:verified-build"), guest = page(other);
         host.c.DC_NET.host(); await turn();
         guest.c.DC_NET.join(host.c.DC_NET.code); await turn(); await turn();

@@ -10,7 +10,7 @@
 <script src="netplay.js?v=3"></script>
 <script src="myview.js?v=3"></script>
 <script src="mods.js?v=3"></script>
-<script src="track-loader.js?v=3"></script>
+<script src="track-loader.js?v=4"></script>
 <style>
   :root { --bg: #0d0f14; --panel: #161a22; --line: #2a3140; --text: #e6e9ef; --muted: #8a93a6; --accent: #f08a24; }
   * { box-sizing: border-box; }
@@ -80,7 +80,7 @@
   <div class="join-banner" id="join-banner" hidden></div>
 
   <label class="track-choice">Track collection
-    <select id="track-select"><option value="original">Original tracks</option><option value="neon-skyway">Neon Skyway — custom track</option></select>
+    <select id="track-select"></select>
     <small id="track-description">Play the game's original tracks.</small>
   </label>
 
@@ -118,7 +118,7 @@
 
 <div id="game-wrap"><div id="game"></div>
   <div id="game-buttons"><button id="my-view" hidden onclick="DC_VIEW.toggle()">Show all views</button><button id="change-track" hidden>Tracks</button><button id="change-game" hidden>Change game</button><button id="net-toggle" hidden>Online</button></div>
-  <div id="track-panel" hidden><p id="track-current"></p><p>Changing tracks restarts the game and leaves your online room.</p><button id="play-neon">Play Neon Skyway</button><button id="play-original" class="secondary">Play original tracks</button><button id="close-tracks" class="secondary">Keep playing</button></div>
+  <div id="track-panel" hidden><p id="track-current"></p><p>Changing tracks restarts the game and leaves your online room.</p><div id="track-buttons"></div><button id="close-tracks" class="secondary">Keep playing</button></div>
   <div id="track-hint" hidden></div>
   <div id="track-error" role="alert" hidden><b>Could not load the custom track</b><p id="track-error-text"></p><button onclick="location.reload()">Try again</button><button class="secondary" onclick="location.href=DC_TRACK.url('original')">Play original tracks</button></div>
   <div id="net-panel" hidden><div id="net-body"></div></div>
@@ -135,13 +135,26 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const picked = { rom: [], bios: [] };
+for (const [id, entry] of Object.entries(DC_TRACK.catalog)) {
+  const option = document.createElement("option");
+  option.value = id;
+  option.textContent = entry.name;
+  $("track-select").appendChild(option);
+  const button = document.createElement("button");
+  button.dataset.track = id;
+  button.textContent = id === "original" ? "Play original tracks" : "Play " + entry.name;
+  if (id === "original") button.className = "secondary";
+  button.onclick = () => { location.href = DC_TRACK.url(id); };
+  $("track-buttons").appendChild(button);
+}
 function showTrackChoice() {
   $("track-select").value = DC_TRACK.id;
-  $("track-description").textContent = DC_TRACK.id === "original" ? "Play the game's original tracks."
-    : "Floating neon roads, alternating esses and braking corners. Select Marina (Track 1) in the game to race Neon Skyway. This preview replaces Track 1 while enabled.";
-  $("track-current").textContent = DC_TRACK.id === "original" ? "Currently playing: original tracks." : "Currently playing: Neon Skyway. Select Marina (Track 1) in the game.";
-  $("play-neon").disabled = DC_TRACK.id === "neon-skyway";
-  $("play-original").disabled = DC_TRACK.id === "original";
+  const entry = DC_TRACK.catalog[DC_TRACK.id];
+  $("track-description").textContent = (entry?.description || "Unknown track selection.")
+    + (DC_TRACK.id === "original" ? "" : " Select Marina (Track 1) in the game to race " + DC_TRACK.name + ".");
+  $("track-current").textContent = "Currently playing: " + DC_TRACK.name + "."
+    + (DC_TRACK.id === "original" ? "" : " Select Marina (Track 1) in the game.");
+  for (const button of $("track-buttons").children) button.disabled = button.dataset.track === DC_TRACK.id;
 }
 showTrackChoice();
 $("track-select").onchange = () => {
@@ -154,8 +167,6 @@ $("track-select").onchange = () => {
 };
 $("change-track").onclick = () => { $("track-panel").hidden = !$("track-panel").hidden; $("net-panel").hidden = true; };
 $("close-tracks").onclick = () => { $("track-panel").hidden = true; };
-$("play-neon").onclick = () => { location.href = DC_TRACK.url("neon-skyway"); };
-$("play-original").onclick = () => { location.href = DC_TRACK.url("original"); };
 const JOIN = new URLSearchParams(location.search).get("join");
 if (JOIN) {
   $("join-banner").hidden = false;
@@ -441,7 +452,7 @@ function start({ fromSaved = false } = {}) {
     if (JOIN) $("net-panel").hidden = false;
     window.DC_NET.init();
     if (DC_TRACK.id !== "original") {
-      $("track-hint").textContent = "Neon Skyway is ready — select Marina (Track 1) in the game.";
+      $("track-hint").textContent = DC_TRACK.name + " is ready — select Marina (Track 1) in the game.";
       $("track-hint").hidden = false;
       $("track-hint").onclick = () => { $("track-hint").hidden = true; };
       setTimeout(() => { $("track-hint").hidden = true; }, 30000);

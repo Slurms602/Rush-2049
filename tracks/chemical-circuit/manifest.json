@@ -1,0 +1,34 @@
+{
+  "id": "chemical-circuit",
+  "name": "Chemical Circuit",
+  "version": 1,
+  "slot": 1,
+  "lengthFeet": 8111,
+  "files": [
+    {
+      "name": "TRACK1.LZS",
+      "bytes": 165941,
+      "sha256": "307e1e8e4522fd92baa368563fd9de0c4213e630228b0496fd4fc357f9723ca7"
+    },
+    {
+      "name": "TRACK1PATH.LZS",
+      "bytes": 11474,
+      "sha256": "11681a2185a4353c7ea45f6c97c75381d05c5bcd8b70f614e32f0449804d3b06"
+    },
+    {
+      "name": "TRACK1PATHBACK.LZS",
+      "bytes": 11379,
+      "sha256": "d069398b0d5109c6e28729a4ff3b54d03a0b0aae94cb7db75dd6c7a239b6cb96"
+    },
+    {
+      "name": "TRACK1ROAD.LZS",
+      "bytes": 191770,
+      "sha256": "45db657f559f41d0e808e14469d7a200652be3f5893e5088ca51d37729d4a6d7"
+    },
+    {
+      "name": "TRACK1WORLDS.LZS",
+      "bytes": 3503,
+      "sha256": "1890abafd48aa46b56c19677c3e4e9c6ad815f3b9df6f180e38f508cf0c5847f"
+    }
+  ]
+}

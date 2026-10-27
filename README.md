@@ -7,13 +7,21 @@ inputs travel between browsers. Nothing is installed, and no game files are host
 
 Other Dreamcast games boot too, but online play has only been tested with Rush 2049.
 
-## Try Neon Skyway
+## Custom tracks
 
-Open the site with `?track=neon-skyway`, or use the **Tracks** button and choose **Play
-Neon Skyway**. In the game, choose **Single Race → Marina (Track 1)**. This loads a new
-floating circuit with neon roads, alternating esses, braking corners, coins and a wing jump. Its files are
-downloaded automatically; your game image is never modified. **Play original tracks**
-restarts with the original disc content.
+Choose a circuit with the **Tracks** button, or open its link:
+
+- [Chemical Circuit](https://slurms602.github.io/Rush-2049/?track=chemical-circuit):
+  blue steel roads, orange pipe gantries, purple chemical pools, linked esses,
+  three elevated crossovers and two wing jumps. The industrial artwork is original,
+  inspired by the atmosphere of Sonic's Chemical Plant Zone.
+- [Neon Skyway](https://slurms602.github.io/Rush-2049/?track=neon-skyway):
+  a floating technical circuit with alternating turns, braking corners and a wing jump.
+
+For either custom circuit, select **Single Race → Marina (Track 1)** in the game.
+The selected circuit temporarily uses Marina's slot for that boot. Its files download
+automatically; your game image is never modified. **Play original tracks** restores
+the original disc content. Changing circuits restarts the game.
 
 For friends, reach the game's main menu before hosting, then use **Online → Host an
 online game**. The invite link includes the custom track selection. Each friend still
@@ -21,9 +29,10 @@ needs their own game and BIOS. Players with different track files cannot join th
 match. Set **PLAYERS** to 2–4 in the game's START GAME menu and accept **Just Play** on
 each controller before selecting the race.
 
-This first custom mode uses Marina's slot; its original name and preview remain in the
+The custom mode uses Marina's slot; its original name and preview remain in the
 game menu. A true seventh menu entry and a browser track editor are still future work.
-The editable layout and generated files are in [tracks/neon-skyway/](tracks/neon-skyway/).
+Editable layouts and generated files are in [tracks/chemical-circuit/](tracks/chemical-circuit/)
+and [tracks/neon-skyway/](tracks/neon-skyway/).
 To build your own version, see the [track builder](tools/trackbuilder/README.md).
 
 ## What each player needs

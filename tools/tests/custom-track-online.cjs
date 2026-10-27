@@ -30,7 +30,7 @@ async function open(slot, code) {
     });
     page.on('crash', () => log(slot, 'CRASH'));
     const url = new URL(site);
-    url.searchParams.set('track', 'neon-skyway');
+    if (!url.searchParams.has('track')) url.searchParams.set('track', 'neon-skyway');
     url.searchParams.delete('pick');
     if (code) url.searchParams.set('join', code); else url.searchParams.delete('join');
     await page.goto(url.href);

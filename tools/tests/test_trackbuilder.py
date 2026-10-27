@@ -53,9 +53,21 @@ class TrackBuilderTests(unittest.TestCase):
         self.assertEqual(road.surface_indices(0), [0, 1, 2])
 
     def test_shipped_bundle_fits_and_has_complete_paths_objects_and_collision(self):
-        files = {p.name: p.read_bytes() for p in (ROOT / "tracks/neon-skyway").glob("*.LZS")}
-        self.assertEqual(len(files), 5)
-        validate_files(files)
+        for directory in (ROOT / "tracks").iterdir():
+            if not (directory / "manifest.json").exists(): continue
+            with self.subTest(track=directory.name):
+                files = {p.name: p.read_bytes() for p in directory.glob("*.LZS")}
+                self.assertEqual(len(files), 5)
+                validate_files(files)
+
+    def test_chemical_layout_has_two_jumps_and_clear_bridges(self):
+        description = json.loads((ROOT / "tracks/chemical-circuit/track.json").read_text())
+        sec, _ = validate_description(description)
+        self.assertEqual(sum(s["gap"] and not sec[i - 1]["gap"] for i, s in enumerate(sec)), 2)
+        # Flattening the elevated return would create real road intersections.
+        for p in description["points"]: p["y"] = 600
+        with self.assertRaisesRegex(ValueError, "vertical clearance"):
+            validate_description(description)
 
     def test_banked_triangles_use_their_geometric_contact_plane(self):
         # A changing bank twists a road quad. The average section normal is
