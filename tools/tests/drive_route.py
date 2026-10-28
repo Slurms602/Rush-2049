@@ -24,16 +24,17 @@ def make_route(description, use_shortcuts=False):
             ramp = b["sections"]
             start = a - 16
             route += main[previous:start]
-            sign = 1 if (ramp[0]["pos"] - main[a]["pos"]) @ main[a]["S"] > 0 else -1
+            lateral = (ramp[0]["pos"] - main[a]["pos"]) @ main[a]["S"]
+            sign = (1 if lateral > 0 else -1) if abs(lateral) > main[a]["width"] * .05 else 0
             anchors = [main[start]["pos"],
                        main[a - 10]["pos"] + main[a - 10]["S"] * sign * main[a - 10]["width"] * .35,
                        ramp[0]["pos"]]
             for p, q in zip(anchors, anchors[1:]):
                 for t in np.linspace(0, 1, max(1, round(np.linalg.norm(q - p) / 10)), endpoint=False):
                     route.append(dict(pos=p * (1 - t) + q * t, gap=False, width=60,
-                                      shortcut=b["spec"]["id"], mainIndex=a))
+                                      shortcut=b["spec"]["id"], phase="approach", mainIndex=a))
             for q in ramp:
-                route.append(dict(q, shortcut=b["spec"]["id"], mainIndex=a))
+                route.append(dict(q, shortcut=b["spec"]["id"], phase="ramp", mainIndex=a))
             p = ramp[-1]["pos"]
             q = b["landing"][0]["pos"] if b["landing"] else main[end]["pos"]
             count = max(2, round(np.linalg.norm(q - p) / 10))
@@ -42,9 +43,9 @@ def make_route(description, use_shortcuts=False):
                 # Only X/Z targets steer the car. The emulator supplies all motion.
                 pos = p * (1 - t) + q * t + [0, 28 * 4 * t * (1 - t), 0]
                 route.append(dict(pos=pos, gap=True, width=60,
-                                  shortcut=b["spec"]["id"], mainIndex=a + round((end - a) * t)))
+                                  shortcut=b["spec"]["id"], phase="flight", mainIndex=a + round((end - a) * t)))
             for q in b["landing"]:
-                route.append(dict(q, shortcut=b["spec"]["id"], mainIndex=end))
+                route.append(dict(q, shortcut=b["spec"]["id"], phase="landing", mainIndex=end))
             previous = end
             taken.append(b["spec"]["id"])
             deck = b["landing"] or [main[end]]
@@ -59,7 +60,7 @@ def make_route(description, use_shortcuts=False):
         curvature = abs(math.atan2(a[0] * b[1] - a[1] * b[0], a @ b)) / max(1, (np.linalg.norm(a) + np.linalg.norm(b)) / 2)
         limit = min(300, max(70, math.sqrt(65 / max(curvature, 1e-6))))
         out.append(dict(pos=q["pos"].tolist(), gap=q["gap"], jump=jump if q["gap"] else 0,
-                        width=q["width"], mainIndex=q["mainIndex"], shortcut=q.get("shortcut"),
+                        width=q["width"], mainIndex=q["mainIndex"], shortcut=q.get("shortcut"), phase=q.get("phase", "main"),
                         limit=limit))
     length = sum(np.linalg.norm(q["pos"] - route[k - 1]["pos"]) for k, q in enumerate(route))
     return dict(sections=out, shortcuts=taken, landings=landings, mainLength=total, routeLength=float(length))

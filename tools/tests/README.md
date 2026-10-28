@@ -65,3 +65,19 @@ that both cars are inside the elevated circuit's bounds. This does not cover fou
 clients or a complete online race with human inputs.
 Page exceptions (including numeric `Infinity`) and video-driver shutdown messages
 fail the online check. Full browser console logs are retained privately for diagnosis.
+
+## Doodle Dimension launch-speed checks
+
+```sh
+RUSH_SHORTCUTS=all RUSH_SHORTCUT_THROTTLE=1 node tools/tests/custom-track-drive.cjs 'http://localhost:8080/?track=doodle-dimension' /tmp/rush-doodle-fast
+RUSH_SHORTCUTS=all RUSH_SHORTCUT_THROTTLE=0.75 node tools/tests/custom-track-drive.cjs 'http://localhost:8080/?track=doodle-dimension' /tmp/rush-doodle-moderate
+```
+
+These runs apply accelerator duty cycles through each approach, launch ramp
+and actual flight (full throttle, or a 75% on/off duty cycle for slower coverage;
+the emulator controller API exposes digital trigger presses). They never apply brakes there, and keep wings
+deployed while airborne. Braking remains available on the ordinary circuit and
+after landing. They require an actual airborne sample, a landing in the intended
+runway, a complete legal lap with no resets, and a minimum takeoff speed scaled
+by the requested throttle. Steering targets report approach/ramp/flight/landing
+phases; all car motion still comes from ordinary controls and native physics.

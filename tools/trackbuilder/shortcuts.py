@@ -44,8 +44,8 @@ def validate(desc, sec):
                 if any(not isinstance(p.get(k), (int, float)) or not math.isfinite(p[k])
                        or abs(p[k]) > 16000 for k in ("x", "y", "z")):
                     raise ValueError("Ramp coordinates must be finite and within +/-16000 ft.")
-                if not 40 <= p.get("width", 60) <= 120 or p.get("bank", 0) != 0 or p.get("gap"):
-                    raise ValueError("Shortcut decks need solid, unbanked pavement 40 to 120 ft wide.")
+                if not 40 <= p.get("width", 60) <= 200 or p.get("bank", 0) != 0 or p.get("gap"):
+                    raise ValueError("Shortcut decks need solid, unbanked pavement 40 to 200 ft wide.")
                 if i and sum((p[k] - points[i - 1][k]) ** 2 for k in ("x", "y", "z")) < 1:
                     raise ValueError("Consecutive ramp points must be at least one foot apart.")
         openings = spec.get("openings", [])
@@ -109,7 +109,11 @@ def add_meshes(branches, meshes, main, tex_ids):
         for deck in (ramp, branch["landing"]):
             for start in range(0, len(deck) - 1, 45):
                 run = list(range(start, min(start + 45, len(deck) - 1) + 1))
-                ribbon_mesh(m, deck, run, tex_ids, deck[-1]["s"])
+                # Give shared-material merges a tiny render-only lift to avoid
+                # depth fighting where the decks overlap. Collision stays exact.
+                visible = ([dict(q, L=q["L"] + q["N"] * .04, R=q["R"] + q["N"] * .04) for q in deck]
+                           if branch["spec"].get("markings") == "integrated" else deck)
+                ribbon_mesh(m, visible, run, tex_ids, deck[-1]["s"])
                 if branch["spec"].get("markings") == "integrated":
                     continue
                 m.texture(tex_ids["FLYMARK"])

@@ -120,6 +120,24 @@ class TrackBuilderTests(unittest.TestCase):
         for branch in description["shortcuts"]:
             self.assertTrue(any(q["gap"] and q["shortcut"] == branch["id"] for q in route["sections"]))
 
+    def test_doodle_launches_flow_from_the_racing_line_with_gentle_grades_and_long_landings(self):
+        import numpy as np
+        from shortcuts import prepare
+        description = json.loads((ROOT / "tracks/doodle-dimension/track.json").read_text())
+        sec, _ = validate_description(description)
+        for branch in prepare(description, sec):
+            with self.subTest(shortcut=branch["spec"]["id"]):
+                ramp = branch["sections"]
+                entry = sec[branch["entry"]]
+                self.assertGreater(np.dot(entry["T"][[0, 2]], ramp[0]["T"][[0, 2]]), .93)
+                turns = [np.linalg.norm(a["T"][[0, 2]] - b["T"][[0, 2]]) / 10
+                         for a, b in zip(ramp, ramp[1:])]
+                self.assertLess(max(turns), 1 / 300)
+                self.assertLess(max(abs(q["T"][1]) for q in ramp), .085)
+                landing = branch["landing"]
+                self.assertGreater(landing[-1]["s"], 350)
+                self.assertGreaterEqual(min(q["width"] for q in landing), 180)
+
     def test_open_ramp_has_no_invisible_closing_collision_wall(self):
         d = {"points": self.description["shortcuts"][0]["ramp"]}
         sec, _ = resample(d, closed=False)

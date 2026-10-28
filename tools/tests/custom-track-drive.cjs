@@ -10,6 +10,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const [site, output, bundle] = process.argv.slice(2);
 if (!site || !output) throw new Error('Usage: custom-track-drive.cjs <site-url> <private-output-dir>');
+const shortcutThrottle = Number(process.env.RUSH_SHORTCUT_THROTTLE || 0);
+if (!Number.isFinite(shortcutThrottle) || shortcutThrottle < 0 || shortcutThrottle > 1) throw new Error('Shortcut throttle must be between 0 and 1');
 const laps = Number(process.env.RUSH_DRIVE_LAPS || 1);
 if (!Number.isInteger(laps) || laps < 1 || laps > 3) throw new Error('RUSH_DRIVE_LAPS must be 1, 2 or 3');
 const browserName = process.env.RUSH_TEST_BROWSER || 'chromium';
@@ -98,7 +100,7 @@ fs.mkdirSync(output, { recursive: true });
         for (let i = 0; i < 5; i++) { await step(120, [[0, 1]]); await step(1, [[0, 0]]); }
         await step(650);
         await page.screenshot({ path: path.join(output, 'grid.png') });
-        await page.evaluate(({ sections, fullThrottle }) => {
+        await page.evaluate(({ sections, fullThrottle, shortcutThrottle }) => {
             const gm = EJS_emulator.gameManager, M = gm.Module;
             const base = M._wasm_get_ram_base();
             window.__driveRAM = { base, bytes: M.HEAPU8.length,
@@ -164,17 +166,19 @@ fs.mkdirSync(output, { recursive: true });
                     const limit = sections[(idx + k) % sections.length].limit;
                     targetSpeed = Math.min(targetSpeed, Math.sqrt(limit ** 2 + 2 * 105 * k * 10));
                 }
-                const braking = !fullThrottle && speed > targetSpeed + 5;
-                gm.functions.simulateInput(0, 13, braking ? 0 : 32767);
+                const inAir = materials.every(m => m === 8);
+                const launch = shortcutThrottle > 0 && (['approach', 'ramp', 'flight'].includes(sections[idx].phase) || (sections[idx].shortcut && inAir));
+                const braking = !fullThrottle && !launch && speed > targetSpeed + 5;
+                gm.functions.simulateInput(0, 13, braking ? 0 : (launch && (DRIVE.frame % 20) >= Math.round(shortcutThrottle * 20) ? 0 : 32767));
                 gm.functions.simulateInput(0, 12, braking ? 32767 : 0);
-                gm.functions.simulateInput(0, 8, sections[idx].gap ? 1 : 0); // B: wings
+                gm.functions.simulateInput(0, 8, (sections[idx].gap || (shortcutThrottle > 0 && sections[idx].shortcut && inAir)) ? 1 : 0); // B: wings
                 if (idx < 40 && DRIVE.lastIndex > sections.length - 40) {
                     DRIVE.laps++; DRIVE.crossings.push(DRIVE.frame);
                 }
                 DRIVE.lastIndex = idx; DRIVE.last = p;
                 if (DRIVE.frame % 10 === 0) {
                     DRIVE.log.push({ frame: DRIVE.frame, p, idx, speed,
-                        slip, steer, targetSpeed, braking, error: Math.sqrt(distance), gap: sections[idx].gap, jump: sections[idx].jump, shortcut: sections[idx].shortcut, mainIndex: sections[idx].mainIndex, laps: DRIVE.laps,
+                        slip, steer, targetSpeed, braking, phase: sections[idx].phase, error: Math.sqrt(distance), gap: sections[idx].gap, jump: sections[idx].jump, shortcut: sections[idx].shortcut, mainIndex: sections[idx].mainIndex, laps: DRIVE.laps,
                         materials,
                         suspension: Array.from(f.slice((model + 0x5cc) / 4, (model + 0x5dc) / 4)) });
                 }
@@ -184,7 +188,7 @@ fs.mkdirSync(output, { recursive: true });
                     QA.budget = 0; return false;
                 }
             };
-        }, { sections, fullThrottle: process.env.RUSH_DRIVE_MODE === 'grip' });
+        }, { sections, fullThrottle: process.env.RUSH_DRIVE_MODE === 'grip', shortcutThrottle });
         let result;
         for (let i = 1; i <= 20 * laps; i++) {
             if (process.env.RUSH_TEST_RESOLUTION_CYCLE === '1' && (i === 2 || i === 4)) {
@@ -211,6 +215,12 @@ fs.mkdirSync(output, { recursive: true });
         assert.ok(result.laps >= laps + 1, `Car must complete ${laps} forward lap(s) within ${6000 * laps} driving frames`);
         assert.equal(result.respawns, 0, 'Respawning must not disguise a missed jump');
         for (const id of route.shortcuts) {
+            if (process.env.RUSH_SHORTCUT_THROTTLE) {
+                const approach = result.log.filter(r => r.shortcut === id && ['approach', 'ramp'].includes(r.phase));
+                assert.ok(approach.length > 5 && approach.every(r => !r.braking), `Shortcut ${id} must be approached without braking`);
+                assert.ok(result.log.find(r => r.shortcut === id && r.gap && r.materials.every(m=>m===8))?.speed >= 160 * shortcutThrottle, `Shortcut ${id} must be taken at racing speed`);
+                console.log(`${id}: no-brake approach; takeoff speed ${Math.round(result.log.find(r => r.shortcut === id && r.gap && r.materials.every(m=>m===8))?.speed || 0)} ft/s`);
+            }
             const airborne = result.log.find((r) => r.shortcut === id && r.gap && r.materials.every((m) => m === 8));
             assert.ok(airborne, `Shortcut ${id} must include real flight`);
             const landing = result.log.find((r) => r.frame > airborne.frame && r.materials.filter((m) => m === 0).length >= 2);

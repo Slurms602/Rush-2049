@@ -2,22 +2,22 @@
   "name": "Doodle Dimension",
   "slot": 1,
   "theme": "doodle",
-  "description": "A midnight cartoon raceway: charcoal asphalt, muted ink-blue water, sculpted grinning portals and two integrated wing-jump shortcuts.",
+  "description": "The original bright illustrated dreamworld, with two flowing high-speed wing-jump shortcuts and long, wide landing decks.",
   "points": [
     {
-      "x": -300,
+      "x": -50,
       "y": 600,
-      "z": -720,
-      "width": 110
+      "z": -830,
+      "width": 140
     },
     {
-      "x": 0,
+      "x": 200,
       "y": 600,
-      "z": -720,
-      "width": 110
+      "z": -780,
+      "width": 140
     },
     {
-      "x": 300,
+      "x": 400,
       "y": 600,
       "z": -720,
       "width": 110
@@ -90,13 +90,13 @@
     },
     {
       "x": 0,
-      "y": 655,
+      "y": 635,
       "z": 940,
       "width": 110
     },
     {
       "x": -190,
-      "y": 645,
+      "y": 635,
       "z": 710,
       "width": 110
     },
@@ -104,35 +104,35 @@
       "x": -430,
       "y": 635,
       "z": 620,
-      "width": 110
+      "width": 200
     },
     {
       "x": -700,
-      "y": 625,
+      "y": 635,
       "z": 740,
-      "width": 110
+      "width": 200
     },
     {
       "x": -950,
-      "y": 615,
+      "y": 630,
       "z": 610,
-      "width": 110
+      "width": 200
     },
     {
       "x": -1060,
-      "y": 605,
+      "y": 620,
       "z": 350,
       "width": 110
     },
     {
       "x": -940,
-      "y": 600,
+      "y": 620,
       "z": 80,
       "width": 110
     },
     {
       "x": -690,
-      "y": 600,
+      "y": 610,
       "z": -80,
       "width": 140
     },
@@ -143,102 +143,112 @@
       "width": 140
     },
     {
-      "x": -850,
+      "x": -650,
       "y": 600,
-      "z": -520,
-      "width": 140
+      "z": -800,
+      "width": 200
     },
     {
-      "x": -680,
+      "x": -330,
       "y": 600,
-      "z": -710,
-      "width": 110
+      "z": -830,
+      "width": 200
     }
   ],
   "checkpoints": [
     0,
     4,
-    6.3,
-    12,
-    17,
-    23.7
+    5.6,
+    17.3,
+    18.5,
+    24.3
   ],
   "shortcuts": [
     {
       "id": "sharks-wake",
-      "name": "Shark’s Wake",
+      "name": "Shark\u2019s Wake",
       "markings": "integrated",
-      "entry": 7.0,
-      "rejoin": 10.0,
+      "entry": 6.0,
+      "rejoin": 17.0,
       "openings": [
         {
-          "side": "L",
-          "from": 6.6,
-          "to": 8.0
+          "from": 5.8,
+          "to": 7.2,
+          "side": "L"
         },
         {
-          "from": 9.2,
-          "to": 10.5,
-          "side": "R"
+          "from": 16.4,
+          "to": 17.8,
+          "side": "L"
+        },
+        {
+          "side": "L",
+          "from": 15.0,
+          "to": 16.5
+        },
+        {
+          "side": "R",
+          "from": 15.0,
+          "to": 16.5
         }
       ],
       "ramp": [
         {
-          "x": 400,
-          "y": 645,
-          "z": 100,
+          "x": 690,
+          "y": 635,
+          "z": 40,
           "width": 110,
           "rails": false
         },
         {
-          "x": 330,
-          "y": 645,
-          "z": 155,
-          "width": 110,
+          "x": 540,
+          "y": 640,
+          "z": 145,
+          "width": 120,
           "rails": false
         },
         {
-          "x": 310,
-          "y": 650,
-          "z": 240,
-          "width": 110,
+          "x": 390,
+          "y": 647,
+          "z": 250,
+          "width": 140,
           "rails": false
         },
         {
-          "x": 320,
-          "y": 672,
-          "z": 330,
-          "width": 110,
+          "x": 240,
+          "y": 660,
+          "z": 355,
+          "width": 150,
           "rails": false
         }
       ],
       "landing": [
         {
-          "x": 340,
-          "y": 649,
-          "z": 450,
-          "width": 120,
+          "x": 130,
+          "y": 635,
+          "z": 432,
+          "width": 200,
           "rails": false
         },
         {
-          "x": 350,
-          "y": 654,
-          "z": 530,
-          "width": 120,
+          "x": -220,
+          "y": 635,
+          "z": 677,
+          "width": 200,
           "rails": false
         },
         {
-          "x": 430,
-          "y": 658,
-          "z": 560,
-          "width": 120,
+          "x": -420,
+          "y": 635,
+          "z": 735,
+          "width": 200,
           "rails": false
         },
         {
-          "x": 550,
-          "y": 660,
-          "z": 550,
-          "width": 120,
+          "x": -700.813,
+          "y": 635.001,
+          "z": 739.961,
+          "width": 200,
           "rails": false
         }
       ]
@@ -247,77 +257,96 @@
       "id": "paperfold",
       "name": "Paperfold",
       "markings": "integrated",
-      "entry": 19.85,
-      "rejoin": 22.8,
+      "entry": 19.0,
+      "rejoin": 24.0,
       "openings": [
         {
-          "from": 19.35,
-          "to": 20.7,
+          "from": 18.8,
+          "to": 20.2,
           "side": "L"
         },
         {
-          "side": "R",
-          "from": 22.0,
-          "to": 23.4
+          "from": 22.9,
+          "to": 24.4,
+          "side": "R"
+        },
+        {
+          "from": 22.9,
+          "to": 24.4,
+          "side": "L"
         }
       ],
       "ramp": [
         {
+          "x": -1060,
+          "y": 620,
+          "z": 350,
+          "width": 110,
+          "rails": false
+        },
+        {
+          "x": -1060,
+          "y": 620,
+          "z": 180,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": -1035,
+          "y": 620,
+          "z": 10,
+          "width": 130,
+          "rails": false
+        },
+        {
           "x": -1000,
-          "y": 600,
-          "z": 100,
-          "width": 88,
-          "rails": false
-        },
-        {
-          "x": -950,
-          "y": 600,
-          "z": 0,
-          "width": 88,
-          "rails": false
-        },
-        {
-          "x": -920,
-          "y": 600,
-          "z": -60,
-          "width": 88,
-          "rails": false
-        },
-        {
-          "x": -900,
-          "y": 606,
-          "z": -130,
-          "width": 88,
-          "rails": false
-        },
-        {
-          "x": -880,
           "y": 629,
-          "z": -220,
-          "width": 88,
+          "z": -160,
+          "width": 140,
           "rails": false
         }
       ],
       "landing": [
         {
-          "x": -850,
+          "x": -965.796,
           "y": 600,
-          "z": -340,
-          "width": 120,
+          "z": -315.143,
+          "width": 200,
           "rails": false
         },
         {
-          "x": -835,
+          "x": -909.154,
           "y": 600,
-          "z": -420,
-          "width": 120,
+          "z": -475.094,
+          "width": 200,
           "rails": false
         },
         {
-          "x": -820,
+          "x": -813.044,
           "y": 600,
-          "z": -500,
-          "width": 120,
+          "z": -614.935,
+          "width": 200,
+          "rails": false
+        },
+        {
+          "x": -684.015,
+          "y": 600,
+          "z": -725.136,
+          "width": 200,
+          "rails": false
+        },
+        {
+          "x": -530.861,
+          "y": 600,
+          "z": -798.187,
+          "width": 200,
+          "rails": false
+        },
+        {
+          "x": -330.0,
+          "y": 600,
+          "z": -830.0,
+          "width": 200,
           "rails": false
         }
       ]

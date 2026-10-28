@@ -1,34 +1,34 @@
 {
   "id": "doodle-dimension",
   "name": "Doodle Dimension",
-  "version": 3,
+  "version": 4,
   "slot": 1,
-  "lengthFeet": 7243,
+  "lengthFeet": 7212,
   "files": [
     {
       "name": "TRACK1.LZS",
-      "bytes": 251196,
-      "sha256": "6ea4c07fe11d32614d898fa0f18c8744d3551bb63a457a20572418add8137c0f"
+      "bytes": 231200,
+      "sha256": "ec58eb6484b2c13444f1d34b7394561be090675fc9c0366ea50d060e7711e27c"
     },
     {
       "name": "TRACK1PATH.LZS",
-      "bytes": 10564,
-      "sha256": "2beff19f150b6f0fc7f048ee759ba32bef0443e9ff6486b356ea32da837eecc7"
+      "bytes": 10606,
+      "sha256": "801eb65c00996f854b3d9dfdbd398de3ceb72ccb1b1f5929da15407121bf05b0"
     },
     {
       "name": "TRACK1PATHBACK.LZS",
-      "bytes": 10536,
-      "sha256": "fadd1af8a754efc4ca8326620f5df3f4282028f2b23d5da8265b561b62727ce1"
+      "bytes": 10571,
+      "sha256": "2e11d6e058ec61290aa9da9dd4bd088e389a1c6359924ea3faecac4addae6d6b"
     },
     {
       "name": "TRACK1ROAD.LZS",
-      "bytes": 166537,
-      "sha256": "703fd3fc50a41d82c86d5b960e2d426e0bcdb24dbfd2b1ec4be9ab45654adfce"
+      "bytes": 178898,
+      "sha256": "1960c51cb8172b232f2ded01605fcc05d4b03be2122e3ea0eb982ced5b601f34"
     },
     {
       "name": "TRACK1WORLDS.LZS",
-      "bytes": 3477,
-      "sha256": "81dbe803e1e8fd2037ddee279362acadafdd812a3ec91e41bc28f62b2a364bd8"
+      "bytes": 3482,
+      "sha256": "2982f24f11b000838e5315a0b3fd5d1d127a560a3a74792e2472e226c715a923"
     }
   ],
   "music": {

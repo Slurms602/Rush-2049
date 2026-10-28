@@ -12,12 +12,11 @@ Other Dreamcast games boot too, but online play has only been tested with Rush 2
 Choose a circuit with the **Tracks** button, or open its link:
 
 - **[Doodle Dimension](https://slurms602.github.io/Rush-2049/?track=doodle-dimension)**:
-  a 7,243-foot midnight cartoon circuit inspired by `track.jpg`, with calm charcoal
-  asphalt, muted teal and plum scenery, a sculpted grinning gateway, shark fins
-  and two integrated wing-jump shortcuts: Shark’s Wake and Paperfold. The supplied audio plays through the game’s native music mixer.
-  It plays inside the game through the native Dreamcast audio mixer, including
-  the normal music volume controls. All music selections use this soundtrack
-  during a Doodle Dimension boot. Select **Single Race → Marina (Track 1)**.
+  a 7,212-foot illustrated circuit inspired by `track.jpg`, with the original
+  bright blue-and-cream tiles, bubble sky, giant grins and shark artwork. Shark’s
+  Wake and Paperfold use flowing takeoffs and broad landing runways in the same
+  road materials. The supplied audio plays through the native Dreamcast music
+  mixer and normal Music controls. Select **Single Race → Marina (Track 1)**.
 - [Chemical Circuit](https://slurms602.github.io/Rush-2049/?track=chemical-circuit):
   blue steel roads, orange pipe gantries, purple chemical pools, linked esses,
   three elevated crossovers, two wing jumps and an optional flight past the upper
@@ -38,11 +37,11 @@ turnoff is on the **right before the far loop**; Chemical Circuit's is on the
 **right of the upper return, after the far-right loop**. The shortcuts bypass bends
 and rejoin before the next required checkpoint; the normal road remains available.
 
-Doodle Dimension uses the main road’s asphalt on its shortcuts, with small wing
-signs and folded guide fins. **Shark’s Wake** branches left after the opening
-grid arches and jumps across the lagoon’s inside bend. **Paperfold** branches
-left on the descent before the final return bends. Carry speed, deploy wings
-(**K**) over the gap, and follow the broad landing deck back onto the circuit.
+Doodle Dimension’s shortcuts use the same colorful tiles as the main road.
+**Shark’s Wake** continues diagonally across the infield where the opening
+westbound sweep turns away. **Paperfold** continues down the outside descent
+where the main road bends right. Carry speed, deploy wings (**K**) over the gap,
+and use the wide landing runway to rejoin the circuit.
 
 For friends, reach the game's main menu before hosting, then use **Online → Host an
 online game**. The invite link includes the custom track selection. Each friend still
