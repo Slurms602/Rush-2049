@@ -94,7 +94,7 @@ class TrackBuilderTests(unittest.TestCase):
             list(Road(data).leaves())
 
     def test_shortcuts_cannot_bypass_a_required_checkpoint(self):
-        for name in ("neon-skyway", "chemical-circuit"):
+        for name in ("neon-skyway", "chemical-circuit", "doodle-dimension"):
             d = json.loads((ROOT / f"tracks/{name}/track.json").read_text())
             sec, _ = validate_description(d)
             self.assertTrue(d["shortcuts"])
@@ -103,6 +103,22 @@ class TrackBuilderTests(unittest.TestCase):
             d["checkpoints"][next_gate] = (branch["entry"] + branch["rejoin"]) / 2
             with self.subTest(track=name), self.assertRaisesRegex(ValueError, "required checkpoint"):
                 validate_description(d)
+
+    def test_doodle_shortcuts_share_the_road_material_without_green_overlays(self):
+        description = json.loads((ROOT / "tracks/doodle-dimension/track.json").read_text())
+        validate_description(description)
+        self.assertEqual(len(description["shortcuts"]), 2)
+        self.assertTrue(all(b["markings"] == "integrated" for b in description["shortcuts"]))
+        track = Track(decode((ROOT / "tracks/doodle-dimension/TRACK1.LZS").read_bytes()))
+        textures = [name for _, name, *_ in track.textures()]
+        self.assertNotIn("FLYMARK", textures)
+        self.assertIn("ROAD", textures)
+        sys.path.insert(0, str(ROOT / "tools/tests"))
+        from drive_route import make_route
+        route = make_route(description, True)
+        self.assertLess(route["routeLength"], route["mainLength"])
+        for branch in description["shortcuts"]:
+            self.assertTrue(any(q["gap"] and q["shortcut"] == branch["id"] for q in route["sections"]))
 
     def test_open_ramp_has_no_invisible_closing_collision_wall(self):
         d = {"points": self.description["shortcuts"][0]["ramp"]}

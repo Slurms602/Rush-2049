@@ -537,7 +537,8 @@ def build(desc, outdir):
         if desc.get("theme") == "doodle":
             import doodle_theme as artwork
         textures = artwork.textures(textures, vq_encode)
-    if branches: textures = sorted(textures + [shortcuts.texture(vq_encode)], key=lambda t: t[0])
+    if any(b["spec"].get("markings") != "integrated" for b in branches):
+        textures = sorted(textures + [shortcuts.texture(vq_encode)], key=lambda t: t[0])
     tex_ids = {t[0]: i for i, t in enumerate(textures)}
     meshes = build_meshes(sec, tex_ids, total)
     shortcuts.add_meshes(branches, meshes, sec, tex_ids)
@@ -549,7 +550,8 @@ def build(desc, outdir):
     # shared object (coins, cones...), and the game waits forever for one that doesn't exist.
     objects = [(f"TRACK{slot}L{i + 1:05d}", m) for i, m in enumerate(meshes)][:desc.get("max_objects", 10**6)]
     if themed:
-        objects += artwork.scenery(sec, tex_ids, Mesh, low)
+        objects += (artwork.scenery(sec, tex_ids, Mesh, low, branches=branches)
+                    if desc.get("theme") == "doodle" else artwork.scenery(sec, tex_ids, Mesh, low))
     objects, placements = reserve_visibility_slots(objects, tex_ids, low, c)
     if desc.get("sky", True): objects.append(("SKYSKY", sky))
     files = {

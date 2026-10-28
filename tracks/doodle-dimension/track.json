@@ -2,7 +2,7 @@
   "name": "Doodle Dimension",
   "slot": 1,
   "theme": "doodle",
-  "description": "An ink-outlined dreamworld of warped cyan tiles, acid bubbles, grinning monsters and a shark lagoon.",
+  "description": "A midnight cartoon raceway: charcoal asphalt, muted ink-blue water, sculpted grinning portals and two integrated wing-jump shortcuts.",
   "points": [
     {
       "x": -300,
@@ -62,13 +62,13 @@
       "x": 300,
       "y": 655,
       "z": 480,
-      "width": 110
+      "width": 140
     },
     {
       "x": 570,
       "y": 660,
       "z": 540,
-      "width": 110
+      "width": 140
     },
     {
       "x": 780,
@@ -134,19 +134,19 @@
       "x": -690,
       "y": 600,
       "z": -80,
-      "width": 110
+      "width": 140
     },
     {
       "x": -710,
       "y": 600,
       "z": -320,
-      "width": 110
+      "width": 140
     },
     {
       "x": -850,
       "y": 600,
       "z": -520,
-      "width": 110
+      "width": 140
     },
     {
       "x": -680,
@@ -158,9 +158,169 @@
   "checkpoints": [
     0,
     4,
-    8,
+    6.3,
     12,
     17,
-    21
+    23.7
+  ],
+  "shortcuts": [
+    {
+      "id": "sharks-wake",
+      "name": "Shark’s Wake",
+      "markings": "integrated",
+      "entry": 7.0,
+      "rejoin": 10.0,
+      "openings": [
+        {
+          "side": "L",
+          "from": 6.6,
+          "to": 8.0
+        },
+        {
+          "from": 9.2,
+          "to": 10.5,
+          "side": "R"
+        }
+      ],
+      "ramp": [
+        {
+          "x": 400,
+          "y": 645,
+          "z": 100,
+          "width": 110,
+          "rails": false
+        },
+        {
+          "x": 330,
+          "y": 645,
+          "z": 155,
+          "width": 110,
+          "rails": false
+        },
+        {
+          "x": 310,
+          "y": 650,
+          "z": 240,
+          "width": 110,
+          "rails": false
+        },
+        {
+          "x": 320,
+          "y": 672,
+          "z": 330,
+          "width": 110,
+          "rails": false
+        }
+      ],
+      "landing": [
+        {
+          "x": 340,
+          "y": 649,
+          "z": 450,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": 350,
+          "y": 654,
+          "z": 530,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": 430,
+          "y": 658,
+          "z": 560,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": 550,
+          "y": 660,
+          "z": 550,
+          "width": 120,
+          "rails": false
+        }
+      ]
+    },
+    {
+      "id": "paperfold",
+      "name": "Paperfold",
+      "markings": "integrated",
+      "entry": 19.85,
+      "rejoin": 22.8,
+      "openings": [
+        {
+          "from": 19.35,
+          "to": 20.7,
+          "side": "L"
+        },
+        {
+          "side": "R",
+          "from": 22.0,
+          "to": 23.4
+        }
+      ],
+      "ramp": [
+        {
+          "x": -1000,
+          "y": 600,
+          "z": 100,
+          "width": 88,
+          "rails": false
+        },
+        {
+          "x": -950,
+          "y": 600,
+          "z": 0,
+          "width": 88,
+          "rails": false
+        },
+        {
+          "x": -920,
+          "y": 600,
+          "z": -60,
+          "width": 88,
+          "rails": false
+        },
+        {
+          "x": -900,
+          "y": 606,
+          "z": -130,
+          "width": 88,
+          "rails": false
+        },
+        {
+          "x": -880,
+          "y": 629,
+          "z": -220,
+          "width": 88,
+          "rails": false
+        }
+      ],
+      "landing": [
+        {
+          "x": -850,
+          "y": 600,
+          "z": -340,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": -835,
+          "y": 600,
+          "z": -420,
+          "width": 120,
+          "rails": false
+        },
+        {
+          "x": -820,
+          "y": 600,
+          "z": -500,
+          "width": 120,
+          "rails": false
+        }
+      ]
+    }
   ]
 }

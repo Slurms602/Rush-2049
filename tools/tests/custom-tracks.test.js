@@ -238,7 +238,7 @@ test('Doodle Dimension installs its shipped files with verified hashes and its o
     assert.equal(c.DC_TRACK.name, 'Doodle Dimension');
     assert.equal(installed[0].length, 6);
     assert.equal(installed[0][5].aliases.length, 17);
-    assert.match(c.DC_TRACK.fingerprint, /^doodle-dimension:2:[a-f0-9]{64}$/);
+    assert.match(c.DC_TRACK.fingerprint, /^doodle-dimension:3:[a-f0-9]{64}$/);
     assert.equal(new URL(c.DC_TRACK.url('doodle-dimension', { leaveRoom: false })).searchParams.get('join'), 'ABCDE');
 });
 

@@ -24,6 +24,8 @@ def validate(desc, sec):
         if not isinstance(spec.get("id"), str) or not spec["id"] or spec["id"] in ids:
             raise ValueError("Each shortcut needs a unique id.")
         ids.add(spec["id"])
+        if spec.get("markings", "green") not in ("green", "integrated"):
+            raise ValueError("Shortcut markings must be green or integrated.")
         a, b = spec.get("entry"), spec.get("rejoin")
         if (not all(isinstance(v, (int, float)) and math.isfinite(v) for v in (a, b))
                 or not 0 < a < b < count - .5):
@@ -108,10 +110,16 @@ def add_meshes(branches, meshes, main, tex_ids):
             for start in range(0, len(deck) - 1, 45):
                 run = list(range(start, min(start + 45, len(deck) - 1) + 1))
                 ribbon_mesh(m, deck, run, tex_ids, deck[-1]["s"])
+                if branch["spec"].get("markings") == "integrated":
+                    continue
                 m.texture(tex_ids["FLYMARK"])
                 m.strip([v for k in run for v in
                          ((deck[k]["L"] + deck[k]["N"] * .08, (0, deck[k]["s"] / 45)),
                           (deck[k]["R"] + deck[k]["N"] * .08, (1, deck[k]["s"] / 45)))])
+        if branch["spec"].get("markings") == "integrated":
+            # The authored theme supplies its own scenery cues. Keep pavement,
+            # rail material and landing decks continuous with the main course.
+            continue
         # A painted arrow on the main road points toward the launch lane.
         q = main[branch["entry"]]
         side = 1 if np.dot(ramp[0]["pos"] - q["pos"], q["S"]) > 0 else -1

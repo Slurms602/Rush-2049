@@ -169,13 +169,14 @@ def preview(sec, total, target, name="Neon Skyway", desc=None):
         for branch in shortcuts.prepare(desc, sec):
             points = [q["pos"] for q in branch["sections"] + branch["landing"]] + [sec[branch["rejoin"]]["pos"]]
             coords = " ".join(f'{p[0]:.1f},{p[2]:.1f}' for p in points)
-            parts.append(f'<polyline points="{coords}" fill="none" stroke="#abff4c" stroke-width="14" stroke-dasharray="24 14"/>')
+            flight_color = '#b6a17d' if branch['spec'].get('markings') == 'integrated' else '#abff4c'
+            parts.append(f'<polyline points="{coords}" fill="none" stroke="{flight_color}" stroke-width="14" stroke-dasharray="24 14"/>')
     indices = shortcuts.checkpoint_indices(desc, sec) if desc else None
     for i, idx in enumerate(indices or [int(i * len(sec) / 6) for i in range(6)]):
         p = sec[idx]["pos"]
         parts.append(f'<circle cx="{p[0]:.1f}" cy="{p[2]:.1f}" r="32" fill="#{"ffffff" if i == 0 else "ffba62"}"/>')
         parts.append(f'<text x="{p[0]:.1f}" y="{p[2] + 12:.1f}" text-anchor="middle" font-size="36" font-family="sans-serif" fill="#101427">{i + 1}</text>')
-    legend = " · green = optional flight" if desc and desc.get("shortcuts") else ""
+    legend = " · dashed = optional flight" if desc and desc.get("shortcuts") else ""
     parts.append(f'<text x="{lo_x + 60:.1f}" y="{lo_z + height - 55:.1f}" fill="#b4c6e3" font-size="36" font-family="sans-serif">{total:.0f} ft · pink = wing jump{legend}</text></svg>')
     target.write_text("\n".join(parts), encoding="utf-8")
 

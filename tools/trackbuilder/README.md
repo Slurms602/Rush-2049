@@ -31,8 +31,9 @@ planes. Road crossovers require at least 32 feet of vertical clearance.
 
 ## Optional flying shortcuts
 
-Both shipped circuits have a separate green launch lane that skips a sequence of
-bends and lands back on the main road. `shortcuts` contains its `id`, `name`, `entry`,
+Neon Skyway and Chemical Circuit use separate green launch lanes that skip bends
+and land back on the main road. Doodle Dimension uses integrated road materials
+and scenery cues instead. `shortcuts` contains its `id`, `name`, `entry`,
 `rejoin`, open-ended `ramp` points, an optional `landing` deck, and `openings` in
 the main road's side rails. Landing points use the same fields as ramp points.
 Progress values such as `24.5` mean halfway between control points 24 and 25.
@@ -129,16 +130,19 @@ See [runtime checks](../tests/README.md) for fresh-boot driving and two-client o
 python3 tools/trackbuilder/build.py tracks/doodle-dimension/track.json --id doodle-dimension --out tracks/doodle-dimension
 ```
 
-The `doodle` theme in `doodle_theme.py` uses Pillow to create ink-outlined tile and
-bubble textures and crops landmark murals from the supplied root `track.jpg`.
-Scenery batches sculptural arches, bubble clusters, murals and the lagoon into nine
-placements. The continuous road has six checkpoints and no mandatory jumps.
+The `doodle` theme in `doodle_theme.py` uses Pillow for subdued asphalt, muted
+ink-grid trim, wave patterns and graded murals from the root `track.jpg`. Nine
+scenery batches hold the lagoon, sculpted grin, shark fins and arches. The road
+has six checkpoints and two optional wing-jump shortcuts. A shortcut with
+`"markings": "integrated"` retains the ROAD/RAIL materials and omits FLYMARK
+overlays, main-road arrow decals and green rejoin posts. Its theme supplies the
+scenery cues; existing circuits keep their default green markers.
 The soundtrack is a native Sega Audio64 `.STR` stream, built entirely from the
 supplied audio. Rebuild it with FFmpeg installed:
 
 ```sh
 python3 tools/trackbuilder/music.py track.webm --out tracks/doodle-dimension/SOUNDTRACK.STR
-python3 tools/trackbuilder/build.py tracks/doodle-dimension/track.json --id doodle-dimension --out tracks/doodle-dimension --version 2
+python3 tools/trackbuilder/build.py tracks/doodle-dimension/track.json --id doodle-dimension --out tracks/doodle-dimension --version 3
 ```
 
 The format is 44.1 kHz stereo PCM16 with 16 KiB channel blocks, a 2 KiB header

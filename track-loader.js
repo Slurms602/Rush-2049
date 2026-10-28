@@ -2,7 +2,7 @@
 (function () {
     "use strict";
     const catalog = Object.freeze({
-        "doodle-dimension": { name: "Doodle Dimension", description: "Race through an illustrated dreamworld: warped blue grids, acid bubbles, giant grins and a shark lagoon. Includes the reference soundtrack." },
+        "doodle-dimension": { name: "Doodle Dimension", description: "A midnight cartoon raceway with charcoal asphalt, sculpted grins, a shark lagoon and two wing-jump shortcuts built into the road. Native in-game soundtrack." },
         "original": { name: "Original tracks", description: "Play the game's original tracks." },
         "neon-skyway": { name: "Neon Skyway", description: "Floating neon roads, alternating esses, a wing jump and an optional flying shortcut across the infield." },
         "chemical-circuit": { name: "Chemical Circuit", description: "Purple pools, orange pipes, elevated crossovers, two wing jumps and an optional flyover past the upper return bends." }
